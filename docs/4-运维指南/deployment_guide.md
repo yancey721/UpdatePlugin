@@ -1,0 +1,282 @@
+# 部署指南
+
+## 1. 概述
+
+本文档提供了应用内更新系统的服务端 (@Server) 和前端管理界面 (@H5) 的部署步骤和环境要求，旨在帮助运维人员顺利完成系统部署和后续维护工作。
+
+## 2. 环境要求
+
+### 2.1 服务端 (@Server)
+
+- **操作系统**: Linux (推荐 CentOS 7+, Ubuntu Server 18.04+)
+- **Java环境**: JDK 8 或更高版本 (与项目开发版本一致)
+- **Maven**: 用于项目构建 (如果需要在服务器上构建)
+- **数据库**: MySQL 5.7 或更高版本
+- **Web服务器/反向代理**: Nginx (推荐)
+- **硬件资源 (最低)**:
+    - CPU: 2核
+    - 内存: 4GB RAM
+    - 磁盘空间: 50GB (取决于APK存储量和日志量)
+- **网络**: 公网IP，开放必要的端口 (如80, 443, 服务端应用端口, MySQL端口)
+
+### 2.2 前端管理界面 (@H5)
+
+- **Web服务器**: Nginx 或其他可以托管静态文件的服务器。
+- **Node.js**: 用于项目构建 (如果需要在服务器上构建)。
+
+### 2.3 依赖服务
+
+- **文件存储**: 
+    - 本地文件系统: 确保有足够的磁盘空间和正确的读写权限。
+    - 对象存储 (如阿里云OSS): 需要配置AccessKey, SecretKey, Bucket等信息。
+- **数据库服务器**: 网络可达，并为应用创建专用数据库和用户。
+
+## 3. 服务端部署 (@Server - Spring Boot)
+
+### 3.1 构建应用
+
+1.  在开发环境或构建服务器上，确保已安装JDK和Maven。
+2.  进入服务端项目根目录 (`Server/`)。
+3.  执行Maven构建命令：
+    ```bash
+    mvn clean package -DskipTests
+    ```
+4.  构建成功后，在 `target/` 目录下会生成 `app-update-server-x.x.x.jar` (或类似名称) 的可执行JAR包。
+
+### 3.2 准备服务器环境
+
+1.  安装JDK。
+    ```bash
+    # 以CentOS为例
+    sudo yum install java-1.8.0-openjdk-devel
+    java -version # 验证安装
+    ```
+2.  安装MySQL数据库 (如果尚未安装)。
+3.  创建数据库和用户，并授权。
+    ```sql
+    CREATE DATABASE app_update_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE USER 'app_updater'@'localhost' IDENTIFIED BY 'your_strong_password';
+    GRANT ALL PRIVILEGES ON app_update_db.* TO 'app_updater'@'localhost';
+    FLUSH PRIVILEGES;
+    ```
+    *注意：`localhost` 可能需要根据实际情况替换为应用服务器的IP或`%`。*
+
+### 3.3 上传与配置应用
+
+1.  将构建好的JAR包上传到服务器的指定目录，例如 `/opt/app-update-server/`。
+2.  在同目录下创建 `config/` 文件夹，用于存放外部化配置文件。
+3.  创建 `config/application.yml` (或 `application.properties`)，配置生产环境参数，特别是数据库连接、文件存储路径、日志路径等。
+    ```yaml
+    # config/application.yml (生产环境示例)
+    server:
+      port: 8080 # 应用监听端口
+    spring:
+      application:
+        name: app-update-server
+      datasource:
+        url: jdbc:mysql://localhost:3306/app_update_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+        username: app_updater
+        password: your_strong_password # 从环境变量或更安全的地方读取
+        driver-class-name: com.mysql.cj.jdbc.Driver
+      jpa:
+        hibernate:
+          ddl-auto: validate # 生产环境建议validate或none
+        show-sql: false
+        properties:
+          hibernate:
+            dialect: org.hibernate.dialect.MySQL8Dialect
+    file:
+      upload-dir: /data/app_updates/apk/ # APK实际存储路径
+      download-base-url: https://your-domain.com/downloads # APK下载基础URL
+    logging:
+      level:
+        com.dongshiqian: INFO
+        org.springframework.web: WARN
+      file:
+        name: /var/log/app-update-server/app-update-server.log # 日志文件路径
+    # ...其他生产环境特定配置
+    ```
+    **安全提示**: 数据库密码等敏感信息不应硬编码，建议使用环境变量或Spring Cloud Config等方式管理。
+
+### 3.4 运行应用
+
+- **直接运行 (前台)**:
+  ```bash
+  java -jar -Dspring.config.location=classpath:/,config/application.yml /opt/app-update-server/app-update-server-x.x.x.jar
+  ```
+- **后台运行 (使用nohup)**:
+  ```bash
+  nohup java -jar -Dspring.config.location=classpath:/,config/application.yml /opt/app-update-server/app-update-server-x.x.x.jar > /var/log/app-update-server/console.log 2>&1 &
+  ```
+- **使用Systemd服务管理 (推荐)**:
+  创建 `/etc/systemd/system/app-update-server.service` 文件：
+  ```ini
+  [Unit]
+  Description=App Update Server
+  After=syslog.target network.target mysqld.service
+
+  [Service]
+  User=appuser # 建议创建一个专用用户运行应用
+  Group=appgroup
+  ExecStart=/usr/bin/java -jar -Dspring.config.location=classpath:/,config/application.yml /opt/app-update-server/app-update-server-x.x.x.jar
+  SuccessExitStatus=143
+  TimeoutStopSec=10
+  Restart=on-failure
+  RestartSec=5
+  WorkingDirectory=/opt/app-update-server/
+  # StandardOutput=syslog # 可选，将标准输出重定向到syslog
+  # StandardError=syslog  # 可选，将标准错误重定向到syslog
+  # SyslogIdentifier=app-update-server
+
+  [Install]
+  WantedBy=multi-user.target
+  ```
+  然后执行：
+  ```bash
+  sudo systemctl daemon-reload
+  sudo systemctl start app-update-server
+  sudo systemctl enable app-update-server # 开机自启
+  sudo systemctl status app-update-server # 查看状态
+  ```
+
+### 3.5 配置Nginx反向代理和APK下载
+
+编辑Nginx配置文件 (通常在 `/etc/nginx/conf.d/your-app.conf` 或 `/etc/nginx/sites-available/your-app`):
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com; # 替换为你的域名
+
+    # 可选：HTTP自动跳转到HTTPS
+    # if ($scheme != "https") {
+    #     return 301 https://$host$request_uri;
+    # }
+
+    # API接口反向代理
+    location /api/ {
+        proxy_pass http://localhost:8080/api/; # Spring Boot应用地址和端口
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # 解决大文件上传超时问题
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        client_max_body_size 500M; # 根据APK最大限制调整
+    }
+
+    # APK文件下载路径 (对应 application.yml 中的 file.download-base-url)
+    location /downloads/ {
+        alias /data/app_updates/apk/; # 对应 application.yml 中的 file.upload-dir
+        autoindex off; # 可选，是否允许列出目录内容
+        expires 7d; # 客户端缓存7天
+        add_header Cache-Control "public";
+        # 可选：增加MIME类型，确保浏览器正确处理APK文件
+        types {
+            application/vnd.android.package-archive apk;
+        }
+        default_type application/octet-stream;
+    }
+
+    # 可选：配置SSL证书 (HTTPS)
+    # listen 443 ssl http2;
+    # server_name your-domain.com;
+    # ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    # include /etc/letsencrypt/options-ssl-nginx.conf;
+    # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    access_log /var/log/nginx/app-update.access.log;
+    error_log /var/log/nginx/app-update.error.log;
+}
+```
+测试Nginx配置并重载：
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+确保防火墙已开放80和443端口。
+
+## 4. 前端管理界面部署 (@H5 - Vue3)
+
+### 4.1 构建应用
+
+1.  在开发环境或构建服务器上，确保已安装Node.js和pnpm/npm/yarn。
+2.  进入前端项目根目录 (`H5/`)。
+3.  修改 `.env.production` 文件，配置生产环境的API基础路径：
+    ```env
+    # .env.production
+    VITE_APP_TITLE=应用更新管理后台
+    VITE_APP_BASE_URL=/api # Nginx反向代理后的API路径
+    ```
+4.  执行构建命令：
+    ```bash
+    pnpm build # 或 npm run build / yarn build
+    ```
+5.  构建成功后，在 `dist/` 目录下会生成静态文件。
+
+### 4.2 上传与配置Web服务器
+
+1.  将 `dist/` 目录下的所有文件上传到Web服务器的指定目录，例如 `/var/www/app-update-admin/`。
+2.  配置Nginx (或其他Web服务器) 以托管这些静态文件，并处理Vue Router的history模式。
+
+    在Nginx配置文件中添加或修改server块：
+    ```nginx
+    server {
+        listen 80; # 或443 (HTTPS)
+        server_name admin.your-domain.com; # 管理后台的域名
+
+        root /var/www/app-update-admin/; # 前端静态文件根目录
+        index index.html index.htm;
+
+        location / {
+            try_files $uri $uri/ /index.html; # 处理Vue Router history模式
+        }
+
+        # 如果API和管理后台在同一域名下，但通过不同路径区分，则API代理配置如上
+        # 如果API在不同子域名或端口，确保前端配置的VITE_APP_BASE_URL正确，并处理好CORS
+        location /api/ {
+            proxy_pass http://localhost:8080/api/; # Spring Boot应用地址和端口
+            # ...其他代理配置同上...
+        }
+
+        access_log /var/log/nginx/admin-app-update.access.log;
+        error_log /var/log/nginx/admin-app-update.error.log;
+
+        # (HTTPS配置同上)
+    }
+    ```
+3.  测试Nginx配置并重载。
+
+## 5. 数据库迁移与初始化
+
+- **首次部署**: 
+    - 如果 `spring.jpa.hibernate.ddl-auto` 设置为 `create` 或 `create-drop` (不推荐生产)，表结构会自动创建。
+    - 如果设置为 `validate` 或 `none` (推荐生产)，需要手动执行数据库设计章节中的SQL脚本来创建表结构。
+    - 可能需要初始化一些基础数据 (如管理员账号)。
+- **后续升级**: 
+    - 如果有数据库表结构变更，需要使用数据库迁移工具 (如Flyway, Liquibase) 或手动执行SQL变更脚本。
+    - **重要**: 升级前务必备份数据库！
+
+## 6. 监控与维护
+
+- **日志监控**: 定期检查服务端应用日志、Nginx访问日志和错误日志。
+    - 服务端日志路径: (示例) `/var/log/app-update-server/app-update-server.log`
+    - Nginx日志路径: (示例) `/var/log/nginx/`
+- **服务状态监控**: 使用 `systemctl status app-update-server` (如果使用Systemd) 或其他监控工具检查服务运行状态。
+- **服务器资源监控**: 监控CPU、内存、磁盘空间、网络流量等。
+- **数据库监控与备份**: 定期备份数据库，监控数据库性能。
+- **应用更新**: 
+    - 服务端: 重新构建JAR包，替换旧的JAR包，然后重启服务 (注意平滑重启或维护窗口)。
+    - 前端: 重新构建静态文件，替换旧的静态文件即可 (浏览器可能有缓存，注意版本控制或强制刷新策略)。
+- **安全更新**: 定期更新服务器操作系统、JDK、Nginx、MySQL等基础软件的安全补丁。
+
+## 7. 回滚策略
+
+- **服务端**: 保留上一个稳定版本的JAR包和配置文件。如果新版本出现严重问题，可以快速回滚到旧版本。
+- **前端**: 保留上一个稳定版本的静态文件。如果新版本出现问题，可以快速替换回旧版本。
+- **数据库**: 如果升级涉及数据库结构变更，回滚会比较复杂。务必在升级前做好充分测试和数据备份。如果需要回滚，可能需要执行反向的SQL变更脚本，并恢复数据。
+
+制定详细的回滚计划，并在非生产环境进行演练。 
