@@ -1,0 +1,332 @@
+{
+  "info": {
+    "name": "Android更新系统API测试",
+    "description": "Android应用更新系统的API测试集合，包含所有核心接口的测试用例",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "your-secret-api-key",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "健康检查",
+      "item": [
+        {
+          "name": "基础连通性测试",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "测试服务器基础连通性，预期返回404表示服务正常运行"
+          },
+          "response": []
+        },
+        {
+          "name": "H2数据库控制台",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/h2-console",
+              "host": ["{{base_url}}"],
+              "path": ["h2-console"]
+            },
+            "description": "访问H2数据库控制台（仅开发环境）"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "APK上传接口",
+      "item": [
+        {
+          "name": "正常上传APK",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "apkFile",
+                  "type": "file",
+                  "src": [],
+                  "description": "选择APK文件"
+                },
+                {
+                  "key": "appId",
+                  "value": "com.example.testapp",
+                  "type": "text",
+                  "description": "应用ID"
+                },
+                {
+                  "key": "updateDescription",
+                  "value": "测试版本更新",
+                  "type": "text",
+                  "description": "更新说明"
+                },
+                {
+                  "key": "forceUpdate",
+                  "value": "false",
+                  "type": "text",
+                  "description": "是否强制更新"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/app/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "app", "upload"]
+            },
+            "description": "上传APK文件并创建新版本"
+          },
+          "response": []
+        },
+        {
+          "name": "强制更新APK",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "apkFile",
+                  "type": "file",
+                  "src": [],
+                  "description": "选择APK文件"
+                },
+                {
+                  "key": "appId",
+                  "value": "com.example.testapp",
+                  "type": "text",
+                  "description": "应用ID"
+                },
+                {
+                  "key": "updateDescription",
+                  "value": "重要安全更新，必须立即升级",
+                  "type": "text",
+                  "description": "更新说明"
+                },
+                {
+                  "key": "forceUpdate",
+                  "value": "true",
+                  "type": "text",
+                  "description": "是否强制更新"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/app/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "app", "upload"]
+            },
+            "description": "上传APK文件并设置为强制更新"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "安全验证测试",
+      "item": [
+        {
+          "name": "无API密钥访问",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "apkFile",
+                  "type": "file",
+                  "src": [],
+                  "description": "选择APK文件"
+                },
+                {
+                  "key": "appId",
+                  "value": "com.example.testapp",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/app/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "app", "upload"]
+            },
+            "description": "测试无API密钥访问，应该被拒绝"
+          },
+          "response": []
+        },
+        {
+          "name": "错误API密钥访问",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "wrong-api-key",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "apkFile",
+                  "type": "file",
+                  "src": [],
+                  "description": "选择APK文件"
+                },
+                {
+                  "key": "appId",
+                  "value": "com.example.testapp",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/app/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "app", "upload"]
+            },
+            "description": "测试错误API密钥访问，应该被拒绝"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "参数验证测试",
+      "item": [
+        {
+          "name": "缺少appId参数",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "apkFile",
+                  "type": "file",
+                  "src": [],
+                  "description": "选择APK文件"
+                },
+                {
+                  "key": "updateDescription",
+                  "value": "测试版本更新",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/app/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "app", "upload"]
+            },
+            "description": "测试缺少必需参数appId的情况"
+          },
+          "response": []
+        },
+        {
+          "name": "缺少APK文件",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "appId",
+                  "value": "com.example.testapp",
+                  "type": "text"
+                },
+                {
+                  "key": "updateDescription",
+                  "value": "测试版本更新",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/app/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "app", "upload"]
+            },
+            "description": "测试缺少APK文件的情况"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// 在每个请求前执行的脚本",
+          "console.log('发送请求到: ' + pm.request.url);"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// 在每个请求后执行的测试脚本",
+          "pm.test('响应时间小于5秒', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "pm.test('响应格式为JSON', function () {",
+          "    pm.response.to.have.header('Content-Type');",
+          "});"
+        ]
+      }
+    }
+  ]
+} 

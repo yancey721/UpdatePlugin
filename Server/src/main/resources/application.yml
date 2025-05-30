@@ -40,7 +40,7 @@ spring:
 # 应用自定义配置
 app:
   # APK文件上传存储路径
-  upload-path: ${UPLOAD_PATH:./apk_uploads/}
+  upload-path: ${UPLOAD_PATH:../apk_uploads/}
   # H2数据库文件路径(仅当使用H2时有效)
   db-path: ${DB_PATH:./database/}
   # 服务器基础URL，用于生成下载链接
