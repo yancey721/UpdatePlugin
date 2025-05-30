@@ -126,4 +126,34 @@ public interface AppVersionRepository extends JpaRepository<AppVersion, Long> {
     List<AppVersion> findUpdatableVersions(@Param("appId") String appId, 
                                           @Param("currentVersionCode") Integer currentVersionCode, 
                                           @Param("status") Integer status);
+
+    /**
+     * 根据状态统计版本数量
+     * 
+     * @param status 状态
+     * @return 版本数量
+     */
+    long countByStatus(Integer status);
+
+    /**
+     * 统计强制更新的版本数量
+     * 
+     * @return 强制更新版本数量
+     */
+    long countByForceUpdateTrue();
+
+    /**
+     * 计算所有版本文件的总大小
+     * 
+     * @return 文件总大小
+     */
+    @Query("SELECT SUM(av.fileSize) FROM AppVersion av")
+    Long sumFileSize();
+
+    /**
+     * 查找最近创建的10个版本
+     * 
+     * @return 最近版本列表
+     */
+    List<AppVersion> findTop10ByOrderByCreateTimeDesc();
 } 

@@ -1,5 +1,6 @@
 package com.dongshiqian.appupdate.service;
 
+import com.dongshiqian.appupdate.dto.AppInfoWithLatestVersionDto;
 import com.dongshiqian.appupdate.dto.AppVersionDto;
 import com.dongshiqian.appupdate.dto.ParsedApkData;
 import com.dongshiqian.appupdate.entity.AppInfo;
@@ -9,6 +10,8 @@ import com.dongshiqian.appupdate.repository.AppInfoRepository;
 import com.dongshiqian.appupdate.repository.AppVersionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -189,5 +192,259 @@ public class AppVersionService {
         dto.setUpdateTime(appVersion.getUpdateTime());
         
         return dto;
+    }
+
+    /**
+     * 查询应用列表（支持分页和搜索）
+     * 
+     * @param appNameQuery 应用名称查询条件（可选）
+     * @param pageable 分页参数
+     * @return 应用信息及最新版本的分页列表
+     */
+    public Page<AppInfoWithLatestVersionDto> getAppsWithLatestVersion(String appNameQuery, Pageable pageable) {
+        Page<AppInfo> appInfoPage;
+        
+        // 根据是否有搜索条件选择不同的查询方法
+        if (StringUtils.hasText(appNameQuery)) {
+            log.info("查询应用列表，搜索条件: {}, 分页: {}", appNameQuery, pageable);
+            appInfoPage = appInfoRepository.findByAppNameContainingWithLatestVersion(appNameQuery, pageable);
+        } else {
+            log.info("查询所有应用列表，分页: {}", pageable);
+            appInfoPage = appInfoRepository.findAllWithLatestVersion(pageable);
+        }
+        
+        // 转换为DTO
+        return appInfoPage.map(this::convertToAppInfoWithLatestVersionDto);
+    }
+
+    /**
+     * 转换AppInfo为AppInfoWithLatestVersionDto
+     * 
+     * @param appInfo 应用信息实体
+     * @return 应用信息及最新版本DTO
+     */
+    private AppInfoWithLatestVersionDto convertToAppInfoWithLatestVersionDto(AppInfo appInfo) {
+        AppInfoWithLatestVersionDto dto = new AppInfoWithLatestVersionDto();
+        
+        // 设置应用基本信息
+        dto.setId(appInfo.getId());
+        dto.setAppId(appInfo.getAppId());
+        dto.setAppName(appInfo.getAppName());
+        dto.setPackageName(appInfo.getPackageName());
+        dto.setCreateTime(appInfo.getCreateTime());
+        dto.setUpdateTime(appInfo.getUpdateTime());
+        
+        // 获取版本总数
+        long totalVersionsLong = appVersionRepository.countByAppInfo(appInfo);
+        dto.setTotalVersions((int) totalVersionsLong);
+        
+        // 获取最新启用的版本信息
+        appVersionRepository.findTopByAppInfoAndStatusOrderByVersionCodeDesc(appInfo, AppVersion.Status.ENABLED.getCode())
+            .ifPresent(latestVersion -> {
+                dto.setLatestVersionId(latestVersion.getId());
+                dto.setLatestVersionCode(latestVersion.getVersionCode());
+                dto.setLatestVersionName(latestVersion.getVersionName());
+                dto.setLatestFileSize(latestVersion.getFileSize());
+                dto.setLatestUpdateDescription(latestVersion.getUpdateDescription());
+                dto.setLatestForceUpdate(latestVersion.getForceUpdate());
+                dto.setLatestStatus(latestVersion.getStatus());
+                dto.setLatestStatusDescription(AppVersion.Status.fromCode(latestVersion.getStatus()).getDescription());
+                dto.setLatestVersionCreateTime(latestVersion.getCreateTime());
+            });
+        
+        return dto;
+    }
+
+    /**
+     * 查询指定应用的版本列表（支持分页）
+     * 
+     * @param appId 应用ID
+     * @param pageable 分页参数
+     * @return 应用版本的分页列表
+     */
+    public Page<AppVersionDto> getAppVersions(String appId, Pageable pageable) {
+        log.info("查询应用版本列表: appId={}, 分页: {}", appId, pageable);
+        
+        // 根据appId查找AppInfo
+        AppInfo appInfo = appInfoRepository.findByAppId(appId)
+                .orElseThrow(() -> new BusinessException("应用ID不存在: " + appId));
+        
+        // 查询该应用的所有版本（按版本号倒序）
+        Page<AppVersion> versionsPage = appVersionRepository.findByAppInfoOrderByVersionCodeDesc(appInfo, pageable);
+        
+        log.info("查询应用版本列表成功: appId={}, 总数={}, 当前页={}, 每页大小={}", 
+                appId, versionsPage.getTotalElements(), versionsPage.getNumber(), versionsPage.getSize());
+        
+        // 转换为DTO
+        return versionsPage.map(this::convertToDto);
+    }
+
+    /**
+     * 修改应用版本信息
+     * 
+     * @param versionId 版本ID
+     * @param updateRequest 更新请求
+     * @return 更新后的版本信息
+     */
+    @Transactional
+    public AppVersionDto updateAppVersion(Long versionId, com.dongshiqian.appupdate.dto.UpdateVersionRequestDto updateRequest) {
+        log.info("修改应用版本信息: versionId={}, request={}", versionId, updateRequest);
+        
+        AppVersion version = appVersionRepository.findById(versionId)
+                .orElseThrow(() -> new BusinessException("版本不存在: " + versionId));
+        
+        // 更新字段
+        if (updateRequest.getUpdateDescription() != null) {
+            version.setUpdateDescription(updateRequest.getUpdateDescription());
+        }
+        if (updateRequest.getForceUpdate() != null) {
+            version.setForceUpdate(updateRequest.getForceUpdate());
+        }
+        if (updateRequest.getStatus() != null) {
+            version.setStatus(updateRequest.getStatus());
+        }
+        
+        version.setUpdateTime(LocalDateTime.now());
+        
+        AppVersion savedVersion = appVersionRepository.save(version);
+        
+        log.info("修改应用版本信息成功: versionId={}, versionCode={}", versionId, savedVersion.getVersionCode());
+        
+        return convertToDto(savedVersion);
+    }
+
+    /**
+     * 删除应用版本
+     * 
+     * @param versionId 版本ID
+     * @param forceDelete 是否强制删除文件
+     */
+    @Transactional
+    public void deleteAppVersion(Long versionId, Boolean forceDelete) {
+        log.info("删除应用版本: versionId={}, forceDelete={}", versionId, forceDelete);
+        
+        AppVersion version = appVersionRepository.findById(versionId)
+                .orElseThrow(() -> new BusinessException("版本不存在: " + versionId));
+        
+        // 删除文件（如果需要）
+        if (forceDelete == null || forceDelete) {
+            try {
+                fileStorageService.deleteFile(version.getApkPath());
+                log.info("删除APK文件成功: {}", version.getApkPath());
+            } catch (Exception e) {
+                log.warn("删除APK文件失败: {}, error={}", version.getApkPath(), e.getMessage());
+            }
+        }
+        
+        // 删除数据库记录
+        appVersionRepository.delete(version);
+        
+        log.info("删除应用版本成功: versionId={}, versionCode={}", versionId, version.getVersionCode());
+    }
+
+    /**
+     * 批量删除应用版本
+     * 
+     * @param batchDeleteRequest 批量删除请求
+     * @return 删除成功的版本ID列表
+     */
+    @Transactional
+    public java.util.List<Long> batchDeleteVersions(com.dongshiqian.appupdate.dto.BatchDeleteRequestDto batchDeleteRequest) {
+        log.info("批量删除应用版本: request={}", batchDeleteRequest);
+        
+        java.util.List<Long> successIds = new java.util.ArrayList<>();
+        java.util.List<String> errors = new java.util.ArrayList<>();
+        
+        for (Long versionId : batchDeleteRequest.getVersionIds()) {
+            try {
+                deleteAppVersion(versionId, batchDeleteRequest.getForceDelete());
+                successIds.add(versionId);
+            } catch (Exception e) {
+                errors.add("版本ID " + versionId + ": " + e.getMessage());
+                log.error("删除版本失败: versionId={}, error={}", versionId, e.getMessage());
+            }
+        }
+        
+        log.info("批量删除应用版本完成: 成功={}, 失败={}", successIds.size(), errors.size());
+        
+        if (!errors.isEmpty() && successIds.isEmpty()) {
+            throw new BusinessException("批量删除失败: " + String.join(", ", errors));
+        } else if (!errors.isEmpty()) {
+            log.warn("部分删除失败: {}", String.join(", ", errors));
+        }
+        
+        return successIds;
+    }
+
+    /**
+     * 更新版本状态
+     * 
+     * @param versionId 版本ID
+     * @param statusRequest 状态更新请求
+     * @return 更新后的版本信息
+     */
+    @Transactional
+    public AppVersionDto updateVersionStatus(Long versionId, com.dongshiqian.appupdate.dto.UpdateStatusRequestDto statusRequest) {
+        log.info("更新版本状态: versionId={}, newStatus={}", versionId, statusRequest.getStatus());
+        
+        AppVersion version = appVersionRepository.findById(versionId)
+                .orElseThrow(() -> new BusinessException("版本不存在: " + versionId));
+        
+        version.setStatus(statusRequest.getStatus());
+        version.setUpdateTime(LocalDateTime.now());
+        
+        AppVersion savedVersion = appVersionRepository.save(version);
+        
+        log.info("更新版本状态成功: versionId={}, status={}", versionId, savedVersion.getStatus());
+        
+        return convertToDto(savedVersion);
+    }
+
+    /**
+     * 获取版本统计信息
+     * 
+     * @return 统计信息
+     */
+    public com.dongshiqian.appupdate.dto.VersionStatsDto getVersionStats() {
+        log.info("获取版本统计信息");
+        
+        com.dongshiqian.appupdate.dto.VersionStatsDto stats = new com.dongshiqian.appupdate.dto.VersionStatsDto();
+        
+        // 应用总数
+        stats.setTotalApps(appInfoRepository.count());
+        
+        // 版本总数
+        stats.setTotalVersions(appVersionRepository.count());
+        
+        // 按状态统计
+        stats.setEnabledVersions(appVersionRepository.countByStatus(1));
+        stats.setDisabledVersions(appVersionRepository.countByStatus(0));
+        stats.setTestVersions(appVersionRepository.countByStatus(2));
+        
+        // 强制更新版本数
+        stats.setForceUpdateVersions(appVersionRepository.countByForceUpdateTrue());
+        
+        // 文件总大小
+        Long totalSize = appVersionRepository.sumFileSize();
+        stats.setTotalFileSize(totalSize != null ? totalSize : 0L);
+        
+        // 最近版本（最近10个）
+        java.util.List<AppVersion> recentVersions = appVersionRepository.findTop10ByOrderByCreateTimeDesc();
+        stats.setRecentVersions(recentVersions.stream()
+                .map(this::convertToDto)
+                .collect(java.util.stream.Collectors.toList()));
+        
+        // 状态统计Map
+        java.util.Map<String, Long> statusStats = new java.util.HashMap<>();
+        statusStats.put("启用", stats.getEnabledVersions());
+        statusStats.put("禁用", stats.getDisabledVersions());
+        statusStats.put("测试", stats.getTestVersions());
+        stats.setStatusStats(statusStats);
+        
+        stats.setStatisticsTime(LocalDateTime.now());
+        
+        log.info("获取版本统计信息成功: totalApps={}, totalVersions={}", stats.getTotalApps(), stats.getTotalVersions());
+        
+        return stats;
     }
 } 
