@@ -3,11 +3,17 @@ package com.yancey.appupdate.config;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
 
 /**
  * Spring Security配置
@@ -27,6 +33,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
+            // 启用CORS
+            .cors().configurationSource(corsConfigurationSource())
+            
+            .and()
+            
             // 禁用CSRF，因为我们使用的是无状态API
             .csrf().disable()
             
@@ -44,6 +55,12 @@ public class SecurityConfig {
             
             // 配置授权规则
             .authorizeHttpRequests()
+                // CORS预检请求（OPTIONS方法）保持开放
+                .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                
+                // 公共API保持开放
+                .antMatchers("/api/public/**").permitAll()
+                
                 // 移动端API保持开放
                 .antMatchers("/api/app/**").permitAll()
                 
@@ -73,6 +90,35 @@ public class SecurityConfig {
             .addFilterBefore(apiKeyAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
             
             .build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        // 允许的域名
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173", // Vite默认端口
+            "http://127.0.0.1:5173"
+        ));
+        
+        // 允许的HTTP方法
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        
+        // 允许的请求头
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        
+        // 允许发送认证信息（如cookies, authorization headers）
+        configuration.setAllowCredentials(true);
+        
+        // 预检请求的缓存时间（秒）
+        configuration.setMaxAge(3600L);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     @Bean
