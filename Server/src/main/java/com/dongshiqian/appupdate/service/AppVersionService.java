@@ -447,4 +447,58 @@ public class AppVersionService {
         
         return stats;
     }
+
+    /**
+     * 移动端检查更新
+     * 
+     * @param appId 应用ID
+     * @param currentVersionCode 当前版本号
+     * @return 更新检查结果
+     */
+    public com.dongshiqian.appupdate.dto.CheckUpdateResponseDto checkUpdate(String appId, Integer currentVersionCode) {
+        log.info("检查更新: appId={}, currentVersionCode={}", appId, currentVersionCode);
+        
+        try {
+            // 1. 查找应用信息
+            AppInfo appInfo = appInfoRepository.findByAppId(appId)
+                    .orElseThrow(() -> new BusinessException("应用ID不存在: " + appId));
+            
+            // 2. 查找最新的启用版本，且版本号大于当前版本
+            java.util.Optional<AppVersion> latestVersionOpt = appVersionRepository
+                    .findTopByAppInfoAndVersionCodeGreaterThanAndStatusOrderByVersionCodeDesc(
+                            appInfo, currentVersionCode, AppVersion.Status.ENABLED.getCode());
+            
+            if (latestVersionOpt.isEmpty()) {
+                log.info("无更新可用: appId={}, currentVersionCode={}", appId, currentVersionCode);
+                return com.dongshiqian.appupdate.dto.CheckUpdateResponseDto.noUpdate();
+            }
+            
+            // 3. 构建更新响应
+            AppVersion latestVersion = latestVersionOpt.get();
+            com.dongshiqian.appupdate.dto.CheckUpdateResponseDto response = 
+                    com.dongshiqian.appupdate.dto.CheckUpdateResponseDto.hasUpdate(
+                            latestVersion.getVersionName(),
+                            latestVersion.getVersionCode(),
+                            latestVersion.getUpdateDescription(),
+                            latestVersion.getForceUpdate(),
+                            latestVersion.getDownloadUrl(),
+                            latestVersion.getMd5(),
+                            latestVersion.getFileSize()
+                    );
+            
+            log.info("发现更新: appId={}, currentVersionCode={} -> newVersionCode={}, forceUpdate={}", 
+                    appId, currentVersionCode, latestVersion.getVersionCode(), latestVersion.getForceUpdate());
+            
+            return response;
+            
+        } catch (BusinessException e) {
+            log.error("检查更新失败: appId={}, currentVersionCode={}, error={}", 
+                    appId, currentVersionCode, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("检查更新失败: appId={}, currentVersionCode={}, error={}", 
+                    appId, currentVersionCode, e.getMessage(), e);
+            throw new BusinessException("检查更新失败: " + e.getMessage());
+        }
+    }
 } 

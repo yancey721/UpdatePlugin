@@ -1,12 +1,13 @@
-# 应用内更新系统 - 管理端API接口文档
+# 应用内更新系统 - API接口文档
 
 ## 概述
 
-本文档描述了应用内更新系统的所有管理端API接口，包括应用版本的查询、创建、修改、删除和统计功能。
+本文档描述了应用内更新系统的所有API接口，包括管理端和移动端接口。
 
 ### 服务器信息
-- **基础URL**: `http://localhost:8080/api/admin/app`
-- **认证方式**: API密钥（待第14个任务实现）
+- **管理端基础URL**: `http://localhost:8080/api/admin/app`
+- **移动端基础URL**: `http://localhost:8080/api/app`
+- **认证方式**: API密钥（待第16个任务实现）
 - **数据格式**: JSON
 - **字符编码**: UTF-8
 
@@ -23,7 +24,97 @@
 }
 ```
 
-## API接口列表
+## 移动端API接口
+
+### 1. 检查更新接口
+
+#### 1.1 检查应用更新
+- **接口**: `POST /check-update`
+- **描述**: 移动端检查应用是否有新版本可更新
+- **请求体**:
+
+```json
+{
+    "appId": "com.unifysign.test",
+    "currentVersionCode": 50
+}
+```
+
+**参数说明**:
+- `appId` (必填): 应用ID
+- `currentVersionCode` (必填): 当前版本号
+
+**响应示例 - 有更新**:
+```json
+{
+    "code": 200,
+    "message": "发现新版本",
+    "data": {
+        "hasUpdate": true,
+        "newVersionName": "1.1.8001",
+        "newVersionCode": 56,
+        "updateDescription": "测试版本-强制更新",
+        "forceUpdate": true,
+        "downloadUrl": "http://localhost:8080/api/app/download/com.unifysign.test-56.apk",
+        "md5": "d96f67fb6e2c8041cba9896ce7cbd8cb",
+        "fileSize": 78083108
+    }
+}
+```
+
+**响应示例 - 无更新**:
+```json
+{
+    "code": 200,
+    "message": "当前已是最新版本",
+    "data": {
+        "hasUpdate": false
+    }
+}
+```
+
+**测试示例**:
+```bash
+# 检查更新 - 有新版本
+curl -X POST "http://localhost:8080/api/app/check-update" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "appId": "com.unifysign.test",
+    "currentVersionCode": 50
+  }'
+
+# 检查更新 - 无更新
+curl -X POST "http://localhost:8080/api/app/check-update" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "appId": "com.unifysign.test",
+    "currentVersionCode": 56
+  }'
+```
+
+### 2. APK下载接口
+
+#### 2.1 下载APK文件
+- **接口**: `GET /download/{fileName}`
+- **描述**: 下载指定的APK文件
+- **参数**:
+  - `fileName` (路径参数): APK文件名
+
+**响应**:
+- **Content-Type**: `application/vnd.android.package-archive`
+- **Content-Disposition**: `attachment; filename="文件名.apk"`
+- **状态码**: 200 (成功) / 404 (文件不存在)
+
+**测试示例**:
+```bash
+# 下载APK文件
+curl -O "http://localhost:8080/api/app/download/com.unifysign.test-56.apk"
+
+# 检查文件信息
+curl -I "http://localhost:8080/api/app/download/com.unifysign.test-56.apk"
+```
+
+## 管理端API接口
 
 ### 1. 应用管理接口
 
