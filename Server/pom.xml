@@ -8,7 +8,7 @@
         <version>2.7.18</version>
         <relativePath/>
     </parent>
-    <groupId>com.dongshiqian</groupId>
+    <groupId>com.yancey</groupId>
     <artifactId>app-update-server</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>app-update-server</name>
