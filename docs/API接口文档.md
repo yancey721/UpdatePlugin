@@ -7,9 +7,30 @@
 ### 服务器信息
 - **管理端基础URL**: `http://localhost:8080/api/admin/app`
 - **移动端基础URL**: `http://localhost:8080/api/app`
-- **认证方式**: API密钥（待第16个任务实现）
+- **认证方式**: 管理端API需要API密钥认证，移动端API无需认证
 - **数据格式**: JSON
 - **字符编码**: UTF-8
+
+### 认证机制
+
+#### 管理端API认证
+所有管理端API（`/api/admin/*`）都需要在请求头中提供API密钥：
+
+```http
+X-API-KEY: your-secret-api-key
+```
+
+**配置API密钥**：
+- 默认密钥：`your-secret-api-key`
+- 可通过环境变量 `ADMIN_API_KEY` 自定义
+- 可在 `application.yml` 中配置 `app.admin.api-key`
+
+**认证错误响应**：
+- 缺少API密钥：返回 `401 Unauthorized`
+- 无效API密钥：返回 `403 Forbidden`
+
+#### 移动端API
+移动端API（`/api/app/*`）无需认证，可直接访问。
 
 ### 通用响应格式
 

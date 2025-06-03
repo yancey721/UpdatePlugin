@@ -8,7 +8,7 @@ import javax.annotation.PostConstruct;
 import java.io.File;
 
 /**
- * 应用配置属性类
+ * 应用配置属性
  * 
  * @author dongshiqian
  * @version 1.0
@@ -22,7 +22,7 @@ public class AppProperties {
     /**
      * APK文件上传存储路径
      */
-    private String uploadPath = "./apk_uploads/";
+    private String uploadPath = "../apk_uploads/";
 
     /**
      * H2数据库文件路径
@@ -35,17 +35,17 @@ public class AppProperties {
     private String serverBaseUrl = "http://localhost:8080";
 
     /**
-     * 管理API配置
+     * 管理端配置
      */
     private Admin admin = new Admin();
 
     /**
-     * 管理API配置内部类
+     * 管理端配置内部类
      */
     @Data
     public static class Admin {
         /**
-         * 管理API的密钥
+         * 管理端API密钥
          */
         private String apiKey = "your-secret-api-key";
     }
