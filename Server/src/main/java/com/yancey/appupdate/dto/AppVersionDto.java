@@ -75,14 +75,9 @@ public class AppVersionDto {
     private Boolean forceUpdate;
 
     /**
-     * 状态：0-禁用，1-启用
+     * 是否为发布版本
      */
-    private Integer status;
-
-    /**
-     * 状态描述
-     */
-    private String statusDescription;
+    private Boolean isReleased;
 
     /**
      * 创建时间

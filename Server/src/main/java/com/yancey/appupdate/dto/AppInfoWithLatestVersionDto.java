@@ -35,6 +35,11 @@ public class AppInfoWithLatestVersionDto {
     private String packageName;
 
     /**
+     * 应用级别是否强制更新
+     */
+    private Boolean forceUpdate;
+
+    /**
      * 应用创建时间
      */
     private LocalDateTime createTime;
@@ -44,49 +49,44 @@ public class AppInfoWithLatestVersionDto {
      */
     private LocalDateTime updateTime;
 
-    // 最新版本信息
+    // 最新发布版本信息
     /**
-     * 最新版本ID
+     * 最新发布版本ID
      */
     private Long latestVersionId;
 
     /**
-     * 最新版本号（数字）
+     * 最新发布版本号（数字）
      */
     private Integer latestVersionCode;
 
     /**
-     * 最新版本名称（字符串）
+     * 最新发布版本名称（字符串）
      */
     private String latestVersionName;
 
     /**
-     * 最新版本文件大小（字节）
+     * 最新发布版本文件大小（字节）
      */
     private Long latestFileSize;
 
     /**
-     * 最新版本更新说明
+     * 最新发布版本更新说明
      */
     private String latestUpdateDescription;
 
     /**
-     * 最新版本是否强制更新
+     * 最新发布版本是否强制更新（版本级别，保留兼容性）
      */
     private Boolean latestForceUpdate;
 
     /**
-     * 最新版本状态：0-禁用，1-启用
+     * 是否为发布版本
      */
-    private Integer latestStatus;
+    private Boolean latestIsReleased;
 
     /**
-     * 最新版本状态描述
-     */
-    private String latestStatusDescription;
-
-    /**
-     * 最新版本创建时间
+     * 最新发布版本创建时间
      */
     private LocalDateTime latestVersionCreateTime;
 

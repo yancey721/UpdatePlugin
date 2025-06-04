@@ -1,8 +1,10 @@
 package com.yancey.appupdate.controller;
 
 import com.yancey.appupdate.dto.ApiResponse;
+import com.yancey.appupdate.dto.AppInfoDto;
 import com.yancey.appupdate.dto.AppInfoWithLatestVersionDto;
 import com.yancey.appupdate.dto.AppVersionDto;
+import com.yancey.appupdate.dto.UpdateForceUpdateRequestDto;
 import com.yancey.appupdate.entity.AppVersion;
 import com.yancey.appupdate.service.AppVersionService;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 
 /**
@@ -263,7 +266,7 @@ public class AdminAppController {
             
             AppVersionDto updatedVersion = appVersionService.updateVersionStatus(versionId, statusRequest);
             
-            log.info("更新版本状态成功: versionId={}, status={}", versionId, updatedVersion.getStatus());
+            log.info("更新版本状态成功: versionId={}, isReleased={}", versionId, updatedVersion.getIsReleased());
             
             return ResponseEntity.ok(ApiResponse.success("状态更新成功", updatedVersion));
             
@@ -293,6 +296,100 @@ public class AdminAppController {
         } catch (Exception e) {
             log.error("获取版本统计信息失败: error={}", e.getMessage(), e);
             return ResponseEntity.badRequest().body(ApiResponse.badRequest(e.getMessage()));
+        }
+    }
+
+    // ===========================================
+    // 发布版本管理相关接口（新增）
+    // ===========================================
+
+    /**
+     * 设置应用的发布版本
+     * 
+     * @param appId 应用ID
+     * @param versionId 要设为发布版本的版本ID
+     * @return 设置后的版本信息
+     */
+    @PutMapping("/{appId}/release-version/{versionId}")
+    public ResponseEntity<ApiResponse<AppVersionDto>> setReleaseVersion(
+            @PathVariable String appId,
+            @PathVariable Long versionId) {
+        
+        try {
+            log.info("设置发布版本: appId={}, versionId={}", appId, versionId);
+            
+            AppVersionDto releasedVersion = appVersionService.setReleaseVersion(appId, versionId);
+            
+            log.info("设置发布版本成功: appId={}, versionId={}, versionCode={}", 
+                    appId, versionId, releasedVersion.getVersionCode());
+            
+            return ResponseEntity.ok(ApiResponse.success("发布版本设置成功", releasedVersion));
+            
+        } catch (IllegalArgumentException e) {
+            log.warn("设置发布版本失败-参数错误: appId={}, versionId={}, error={}", appId, versionId, e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.badRequest(e.getMessage()));
+        } catch (Exception e) {
+            log.error("设置发布版本失败: appId={}, versionId={}, error={}", appId, versionId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(ApiResponse.error("系统错误，请稍后重试"));
+        }
+    }
+
+    /**
+     * 更新应用强制更新设置
+     * 
+     * @param appId 应用ID
+     * @param request 强制更新设置请求
+     * @return 更新后的应用信息
+     */
+    @PutMapping("/{appId}/force-update")
+    public ResponseEntity<ApiResponse<AppInfoDto>> updateAppForceUpdate(
+            @PathVariable String appId,
+            @RequestBody @Valid UpdateForceUpdateRequestDto request) {
+        
+        try {
+            log.info("更新应用强制更新设置: appId={}, forceUpdate={}", appId, request.getForceUpdate());
+            
+            AppInfoDto updatedApp = appVersionService.updateAppForceUpdate(appId, request.getForceUpdate());
+            
+            log.info("更新应用强制更新设置成功: appId={}, forceUpdate={}", appId, request.getForceUpdate());
+            
+            return ResponseEntity.ok(ApiResponse.success("设置更新成功", updatedApp));
+            
+        } catch (IllegalArgumentException e) {
+            log.warn("更新应用强制更新设置失败-参数错误: appId={}, error={}", appId, e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.badRequest(e.getMessage()));
+        } catch (Exception e) {
+            log.error("更新应用强制更新设置失败: appId={}, error={}", appId, e.getMessage(), e);
+            return ResponseEntity.badRequest().body(ApiResponse.badRequest("系统错误，请稍后重试"));
+        }
+    }
+
+    /**
+     * 获取当前发布版本
+     * 
+     * @param appId 应用ID
+     * @return 当前发布版本信息
+     */
+    @GetMapping("/{appId}/release-version")
+    public ResponseEntity<ApiResponse<AppVersionDto>> getCurrentReleaseVersion(
+            @PathVariable String appId) {
+        
+        try {
+            log.info("获取当前发布版本: appId={}", appId);
+            
+            AppVersionDto releaseVersion = appVersionService.getCurrentReleaseVersion(appId);
+            
+            if (releaseVersion != null) {
+                log.info("获取当前发布版本成功: appId={}, versionCode={}", appId, releaseVersion.getVersionCode());
+                return ResponseEntity.ok(ApiResponse.success("查询成功", releaseVersion));
+            } else {
+                log.info("应用无发布版本: appId={}", appId);
+                return ResponseEntity.ok(ApiResponse.success("应用暂无发布版本", null));
+            }
+            
+        } catch (Exception e) {
+            log.error("获取当前发布版本失败: appId={}, error={}", appId, e.getMessage(), e);
+            return ResponseEntity.badRequest().body(ApiResponse.badRequest("查询失败: " + e.getMessage()));
         }
     }
 } 

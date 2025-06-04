@@ -49,7 +49,7 @@ export const getAppList = async (page: number = 0, size: number = 10, appNameQue
     params.appNameQuery = appNameQuery
   }
   
-  const response = await api.get<ApiResponse<any>>('/api/admin/app/list', { params })
+  const response = await api.get<ApiResponse<any>>('/api/admin/app/apps', { params })
   return response.data
 }
 

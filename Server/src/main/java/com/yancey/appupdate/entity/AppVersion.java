@@ -83,10 +83,10 @@ public class AppVersion {
     private Boolean forceUpdate = false;
 
     /**
-     * 状态：0-禁用，1-启用
+     * 是否为发布版本
      */
-    @Column(name = "status", nullable = false)
-    private Integer status = 1;
+    @Column(name = "is_released", nullable = false)
+    private Boolean isReleased = false;
 
     /**
      * 创建时间
@@ -101,38 +101,4 @@ public class AppVersion {
     @UpdateTimestamp
     @Column(name = "update_time", nullable = false)
     private LocalDateTime updateTime;
-
-    /**
-     * 状态枚举
-     */
-    public enum Status {
-        DISABLED(0, "禁用"),
-        ENABLED(1, "启用"),
-        TEST(2, "测试");
-
-        private final int code;
-        private final String description;
-
-        Status(int code, String description) {
-            this.code = code;
-            this.description = description;
-        }
-
-        public int getCode() {
-            return code;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-
-        public static Status fromCode(int code) {
-            for (Status status : values()) {
-                if (status.code == code) {
-                    return status;
-                }
-            }
-            throw new IllegalArgumentException("Unknown status code: " + code);
-        }
-    }
 } 

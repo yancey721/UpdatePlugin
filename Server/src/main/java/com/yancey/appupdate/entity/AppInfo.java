@@ -45,6 +45,12 @@ public class AppInfo {
     private String packageName;
 
     /**
+     * 是否强制更新
+     */
+    @Column(name = "force_update", nullable = false)
+    private Boolean forceUpdate = false;
+
+    /**
      * 创建时间
      */
     @CreationTimestamp

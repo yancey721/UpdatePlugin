@@ -5,6 +5,7 @@ import com.yancey.appupdate.entity.AppVersion;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -21,6 +22,47 @@ import java.util.Optional;
  */
 @Repository
 public interface AppVersionRepository extends JpaRepository<AppVersion, Long> {
+
+    // ===========================================
+    // 发布版本管理相关方法（新增）
+    // ===========================================
+
+    /**
+     * 查找应用的当前发布版本
+     * 
+     * @param appId 应用ID
+     * @return 发布版本
+     */
+    Optional<AppVersion> findByAppInfo_AppIdAndIsReleasedTrue(String appId);
+
+    /**
+     * 批量更新应用的所有版本为非发布状态
+     * 
+     * @param appId 应用ID
+     * @return 更新的记录数
+     */
+    @Modifying
+    @Query("UPDATE AppVersion av SET av.isReleased = false WHERE av.appInfo.appId = :appId")
+    int updateAllVersionsToNonReleased(@Param("appId") String appId);
+
+    /**
+     * 查找应用的所有发布版本（用于验证数据一致性）
+     * 
+     * @param appId 应用ID
+     * @return 发布版本列表
+     */
+    List<AppVersion> findByAppInfo_AppIdAndIsReleasedTrueOrderByVersionCodeDesc(String appId);
+
+    /**
+     * 统计发布版本数量
+     * 
+     * @return 发布版本总数
+     */
+    long countByIsReleasedTrue();
+
+    // ===========================================
+    // 原有方法（保持兼容性）
+    // ===========================================
 
     /**
      * 根据应用信息和版本号查找版本
@@ -50,32 +92,38 @@ public interface AppVersionRepository extends JpaRepository<AppVersion, Long> {
     Page<AppVersion> findByAppInfoOrderByCreateTimeDesc(AppInfo appInfo, Pageable pageable);
 
     /**
-     * 查找指定应用的最新启用版本
+     * 查找指定应用的最新启用版本（兼容性方法，逐步迁移到发布版本）
      * 
      * @param appInfo 应用信息
      * @param status 状态（1-启用）
      * @return 最新启用版本
+     * @deprecated 使用 findByAppInfo_AppIdAndIsReleasedTrue 替代
      */
+    @Deprecated
     Optional<AppVersion> findTopByAppInfoAndStatusOrderByVersionCodeDesc(AppInfo appInfo, Integer status);
 
     /**
-     * 查找指定应用中版本号大于指定值的最新启用版本
+     * 查找指定应用中版本号大于指定值的最新启用版本（兼容性方法）
      * 
      * @param appInfo 应用信息
      * @param versionCode 当前版本号
      * @param status 状态（1-启用）
      * @return 更新版本
+     * @deprecated 使用发布版本逻辑替代
      */
+    @Deprecated
     Optional<AppVersion> findTopByAppInfoAndVersionCodeGreaterThanAndStatusOrderByVersionCodeDesc(
             AppInfo appInfo, Integer versionCode, Integer status);
 
     /**
-     * 查找指定应用的所有启用版本
+     * 查找指定应用的所有启用版本（兼容性方法）
      * 
      * @param appInfo 应用信息
      * @param status 状态（1-启用）
      * @return 启用版本列表
+     * @deprecated 使用发布版本逻辑替代
      */
+    @Deprecated
     List<AppVersion> findByAppInfoAndStatusOrderByVersionCodeDesc(AppInfo appInfo, Integer status);
 
     /**
@@ -104,22 +152,26 @@ public interface AppVersionRepository extends JpaRepository<AppVersion, Long> {
     long countByAppInfo(AppInfo appInfo);
 
     /**
-     * 统计指定应用的启用版本数量
+     * 统计指定应用的启用版本数量（兼容性方法）
      * 
      * @param appInfo 应用信息
      * @param status 状态（1-启用）
      * @return 启用版本数量
+     * @deprecated 使用发布版本统计替代
      */
+    @Deprecated
     long countByAppInfoAndStatus(AppInfo appInfo, Integer status);
 
     /**
-     * 查找所有需要更新的版本（版本号大于指定值的启用版本）
+     * 查找所有需要更新的版本（兼容性方法，逐步迁移）
      * 
      * @param appId 应用ID
      * @param currentVersionCode 当前版本号
      * @param status 状态（1-启用）
      * @return 可更新的版本列表
+     * @deprecated 使用发布版本逻辑替代
      */
+    @Deprecated
     @Query("SELECT av FROM AppVersion av JOIN av.appInfo ai " +
            "WHERE ai.appId = :appId AND av.versionCode > :currentVersionCode AND av.status = :status " +
            "ORDER BY av.versionCode DESC")
@@ -128,11 +180,13 @@ public interface AppVersionRepository extends JpaRepository<AppVersion, Long> {
                                           @Param("status") Integer status);
 
     /**
-     * 根据状态统计版本数量
+     * 根据状态统计版本数量（兼容性方法）
      * 
      * @param status 状态
      * @return 版本数量
+     * @deprecated 使用发布版本统计替代
      */
+    @Deprecated
     long countByStatus(Integer status);
 
     /**

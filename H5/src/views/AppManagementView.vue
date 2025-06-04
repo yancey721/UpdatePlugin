@@ -143,7 +143,7 @@
                       size="small" 
                       class="latest-tag"
                     >
-                      当前最新版本
+                      当前发布版本
                     </el-tag>
                   </div>
                 </template>
