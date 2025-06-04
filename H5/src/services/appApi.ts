@@ -1,5 +1,12 @@
 import api, { updateBaseURL } from './api'
 import type { ApiResponse } from './api'
+import type { 
+  AppInfo, 
+  AppVersion, 
+  AppInfoWithLatestVersion, 
+  UpdateForceUpdateRequest, 
+  PageResponse 
+} from '../types/app'
 
 /**
  * 验证API密钥
@@ -43,14 +50,18 @@ export const validateApiKey = async (apiKey: string, serverUrl?: string): Promis
  * @param appNameQuery 应用名称查询条件
  * @returns 应用列表
  */
-export const getAppList = async (page: number = 0, size: number = 10, appNameQuery?: string) => {
+export const getAppList = async (
+  page: number = 0, 
+  size: number = 10, 
+  appNameQuery?: string
+): Promise<PageResponse<AppInfoWithLatestVersion>> => {
   const params: any = { page, size }
   if (appNameQuery) {
     params.appNameQuery = appNameQuery
   }
   
-  const response = await api.get<ApiResponse<any>>('/api/admin/app/apps', { params })
-  return response.data
+  const response = await api.get<ApiResponse<PageResponse<AppInfoWithLatestVersion>>>('/api/admin/app/apps', { params })
+  return response.data.data
 }
 
 /**
@@ -66,7 +77,7 @@ export const uploadApk = async (
   appId: string, 
   updateDescription?: string, 
   forceUpdate: boolean = false
-) => {
+): Promise<AppVersion> => {
   const formData = new FormData()
   formData.append('apkFile', file)
   formData.append('appId', appId)
@@ -75,12 +86,12 @@ export const uploadApk = async (
   }
   formData.append('forceUpdate', forceUpdate.toString())
   
-  const response = await api.post<ApiResponse<any>>('/api/admin/app/upload', formData, {
+  const response = await api.post<ApiResponse<AppVersion>>('/api/admin/app/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
     }
   })
-  return response.data
+  return response.data.data
 }
 
 /**
@@ -90,24 +101,71 @@ export const uploadApk = async (
  * @param size 每页大小
  * @returns 版本列表
  */
-export const getAppVersions = async (appId: string, page: number = 0, size: number = 10) => {
-  const response = await api.get<ApiResponse<any>>(`/api/admin/app/${appId}/versions`, {
+export const getAppVersions = async (
+  appId: string, 
+  page: number = 0, 
+  size: number = 10
+): Promise<PageResponse<AppVersion>> => {
+  const response = await api.get<ApiResponse<PageResponse<AppVersion>>>(`/api/admin/app/app/${appId}/versions`, {
     params: { page, size }
   })
-  return response.data
+  return response.data.data
 }
+
+// ===========================================
+// 发布版本管理相关API（新增）
+// ===========================================
+
+/**
+ * 设置发布版本
+ * @param appId 应用ID
+ * @param versionId 版本ID
+ * @returns 设置结果
+ */
+export const setReleaseVersion = async (appId: string, versionId: number): Promise<AppVersion> => {
+  const response = await api.put<ApiResponse<AppVersion>>(`/api/admin/app/${appId}/release-version/${versionId}`)
+  return response.data.data
+}
+
+/**
+ * 更新应用的强制更新设置
+ * @param appId 应用ID
+ * @param forceUpdate 是否强制更新
+ * @returns 更新结果
+ */
+export const updateAppForceUpdate = async (appId: string, forceUpdate: boolean): Promise<AppInfo> => {
+  const response = await api.put<ApiResponse<AppInfo>>(`/api/admin/app/${appId}/force-update`, {
+    forceUpdate
+  })
+  return response.data.data
+}
+
+/**
+ * 获取当前发布版本
+ * @param appId 应用ID
+ * @returns 当前发布版本信息
+ */
+export const getCurrentReleaseVersion = async (appId: string): Promise<AppVersion | null> => {
+  const response = await api.get<ApiResponse<AppVersion | null>>(`/api/admin/app/${appId}/release-version`)
+  return response.data.data
+}
+
+// ===========================================
+// 兼容性方法（保留但标记为废弃）
+// ===========================================
 
 /**
  * 更新版本状态
  * @param versionId 版本ID
  * @param status 状态（0-禁用，1-启用）
  * @returns 更新结果
+ * @deprecated 使用 setReleaseVersion 替代
  */
-export const updateVersionStatus = async (versionId: number, status: number) => {
-  const response = await api.put<ApiResponse<any>>(`/api/admin/app/version/${versionId}/status`, {
+export const updateVersionStatus = async (versionId: number, status: number): Promise<AppVersion> => {
+  const response = await api.put<ApiResponse<AppVersion>>(`/api/admin/app/version/${versionId}/status`, {
     status
   })
-  return response.data
+  return response.data.data
 }
 
 /**
@@ -115,7 +173,7 @@ export const updateVersionStatus = async (versionId: number, status: number) => 
  * @param versionId 版本ID
  * @returns 删除结果
  */
-export const deleteVersion = async (versionId: number) => {
-  const response = await api.delete<ApiResponse<any>>(`/api/admin/app/version/${versionId}`)
-  return response.data
+export const deleteVersion = async (versionId: number): Promise<void> => {
+  const response = await api.delete<ApiResponse<void>>(`/api/admin/app/version/${versionId}`)
+  return response.data.data
 } 

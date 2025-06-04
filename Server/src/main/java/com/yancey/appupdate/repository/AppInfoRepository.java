@@ -116,37 +116,4 @@ public interface AppInfoRepository extends JpaRepository<AppInfo, Long> {
            "WHERE ai.appName LIKE %:appName% AND " +
            "(av.id IS NULL OR av.id = (SELECT MAX(av2.id) FROM AppVersion av2 WHERE av2.appInfo = ai AND av2.isReleased = true))")
     Page<AppInfo> findByAppNameContainingWithLatestVersion(@Param("appName") String appName, Pageable pageable);
-
-    /**
-     * 查询应用信息及其最新启用版本（兼容性方法，逐步迁移）
-     * 
-     * @param pageable 分页参数
-     * @return 应用信息分页列表
-     * @deprecated 使用 findAllWithLatestVersion 替代
-     */
-    @Deprecated
-    @Query(value = "SELECT DISTINCT ai FROM AppInfo ai LEFT JOIN FETCH ai.versions av " +
-           "WHERE av.id IS NULL OR av.id = (SELECT MAX(av2.id) FROM AppVersion av2 WHERE av2.appInfo = ai AND av2.status = 1) " +
-           "ORDER BY ai.createTime DESC",
-           countQuery = "SELECT COUNT(DISTINCT ai) FROM AppInfo ai LEFT JOIN ai.versions av " +
-           "WHERE av.id IS NULL OR av.id = (SELECT MAX(av2.id) FROM AppVersion av2 WHERE av2.appInfo = ai AND av2.status = 1)")
-    Page<AppInfo> findAllWithLatestEnabledVersion(Pageable pageable);
-
-    /**
-     * 根据应用名称模糊查询应用信息及其最新启用版本（兼容性方法，逐步迁移）
-     * 
-     * @param appName 应用名称
-     * @param pageable 分页参数
-     * @return 应用信息分页列表
-     * @deprecated 使用 findByAppNameContainingWithLatestVersion 替代
-     */
-    @Deprecated
-    @Query(value = "SELECT DISTINCT ai FROM AppInfo ai LEFT JOIN FETCH ai.versions av " +
-           "WHERE ai.appName LIKE %:appName% AND " +
-           "(av.id IS NULL OR av.id = (SELECT MAX(av2.id) FROM AppVersion av2 WHERE av2.appInfo = ai AND av2.status = 1)) " +
-           "ORDER BY ai.createTime DESC",
-           countQuery = "SELECT COUNT(DISTINCT ai) FROM AppInfo ai LEFT JOIN ai.versions av " +
-           "WHERE ai.appName LIKE %:appName% AND " +
-           "(av.id IS NULL OR av.id = (SELECT MAX(av2.id) FROM AppVersion av2 WHERE av2.appInfo = ai AND av2.status = 1))")
-    Page<AppInfo> findByAppNameContainingWithLatestEnabledVersion(@Param("appName") String appName, Pageable pageable);
 } 

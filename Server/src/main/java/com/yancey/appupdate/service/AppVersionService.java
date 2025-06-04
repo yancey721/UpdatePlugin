@@ -297,9 +297,6 @@ public class AppVersionService {
         if (updateRequest.getForceUpdate() != null) {
             version.setForceUpdate(updateRequest.getForceUpdate());
         }
-        if (updateRequest.getStatus() != null) {
-            version.setStatus(updateRequest.getStatus());
-        }
         
         version.setUpdateTime(LocalDateTime.now());
         
@@ -374,25 +371,28 @@ public class AppVersionService {
     }
 
     /**
-     * 更新版本状态
+     * 更新版本状态（废弃方法，使用发布版本管理替代）
      * 
      * @param versionId 版本ID
      * @param statusRequest 状态更新请求
      * @return 更新后的版本信息
+     * @deprecated 使用 setReleaseVersion 方法替代
      */
+    @Deprecated
     @Transactional
     public AppVersionDto updateVersionStatus(Long versionId, com.yancey.appupdate.dto.UpdateStatusRequestDto statusRequest) {
-        log.info("更新版本状态: versionId={}, newStatus={}", versionId, statusRequest.getStatus());
+        log.warn("使用了废弃的updateVersionStatus方法，建议使用setReleaseVersion替代: versionId={}", versionId);
         
         AppVersion version = appVersionRepository.findById(versionId)
                 .orElseThrow(() -> new BusinessException("版本不存在: " + versionId));
         
-        version.setStatus(statusRequest.getStatus());
+        // 不再支持status字段，直接返回当前版本信息
+        // version.setStatus(statusRequest.getStatus());
         version.setUpdateTime(LocalDateTime.now());
         
         AppVersion savedVersion = appVersionRepository.save(version);
         
-        log.info("更新版本状态成功: versionId={}, status={}", versionId, savedVersion.getStatus());
+        log.warn("updateVersionStatus方法已废弃，请使用发布版本管理: versionId={}", versionId);
         
         return convertToDto(savedVersion);
     }
@@ -413,10 +413,10 @@ public class AppVersionService {
         // 版本总数
         stats.setTotalVersions(appVersionRepository.count());
         
-        // 按状态统计
-        stats.setEnabledVersions(appVersionRepository.countByStatus(1));
-        stats.setDisabledVersions(appVersionRepository.countByStatus(0));
-        stats.setTestVersions(appVersionRepository.countByStatus(2));
+        // 发布版本统计（替代原有的状态统计）
+        stats.setEnabledVersions(appVersionRepository.countByIsReleasedTrue());
+        stats.setDisabledVersions(appVersionRepository.count() - appVersionRepository.countByIsReleasedTrue());
+        stats.setTestVersions(0L); // 不再区分测试版本
         
         // 强制更新版本数
         stats.setForceUpdateVersions(appVersionRepository.countByForceUpdateTrue());
@@ -430,13 +430,6 @@ public class AppVersionService {
         stats.setRecentVersions(recentVersions.stream()
                 .map(this::convertToDto)
                 .collect(java.util.stream.Collectors.toList()));
-        
-        // 状态统计Map
-        java.util.Map<String, Long> statusStats = new java.util.HashMap<>();
-        statusStats.put("启用", stats.getEnabledVersions());
-        statusStats.put("禁用", stats.getDisabledVersions());
-        statusStats.put("测试", stats.getTestVersions());
-        stats.setStatusStats(statusStats);
         
         stats.setStatisticsTime(LocalDateTime.now());
         

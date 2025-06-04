@@ -138,7 +138,7 @@
                   <div class="version-cell">
                     <span class="version-number">{{ row.version }}</span>
                     <el-tag 
-                      v-if="row.isLatest" 
+                      v-if="row.isReleased" 
                       type="success" 
                       size="small" 
                       class="latest-tag"
@@ -177,8 +177,21 @@
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="100" align="left" header-align="left">
+              <el-table-column label="操作" width="200" align="left" header-align="left">
                 <template #default="{ row }">
+                  <el-button 
+                    v-if="!row.isReleased"
+                    type="success" 
+                    link
+                    class="release-button"
+                    @click="handleSetReleaseVersion(row)"
+                  >
+                    <el-icon class="release-icon">
+                      <Check />
+                    </el-icon>
+                    设为发布版本
+                  </el-button>
+                  
                   <el-button 
                     type="primary" 
                     link
@@ -309,8 +322,16 @@ import {
   Folder, 
   SwitchButton,
   Document,
-  Close
+  Close,
+  Check
 } from '@element-plus/icons-vue'
+import { 
+  updateAppForceUpdate, 
+  setReleaseVersion,
+  uploadApk,
+  getAppList,
+  getAppVersions
+} from '../services/appApi'
 
 // 应用数据类型
 interface AppVersion {
@@ -321,7 +342,7 @@ interface AppVersion {
   downloads: number
   updateTime: string
   description: string
-  isLatest: boolean
+  isReleased: boolean
 }
 
 interface AppInfo {
@@ -338,135 +359,46 @@ interface AppInfo {
 const router = useRouter()
 const searchQuery = ref('')
 const selectedApp = ref<AppInfo | null>(null)
+const apps = ref<AppInfo[]>([])
+const loading = ref(false)
 
-// 模拟应用数据
-const apps = ref<AppInfo[]>([
-  {
-    id: '1',
-    name: '掌上信手书',
-    packageId: 'cn.org.bjca.signet.unify.app',
-    color: '#4F8EF7',
-    forceUpdate: true,
-    versions: [
-      {
-        id: '1',
-        version: '1.0.8_yhca',
-        build: 4,
-        size: '43.4 MB',
-        downloads: 6008,
-        updateTime: '2024-05-30 19:46',
-        description: '- 修复已知BUG\n- 优化用户体验',
-        isLatest: true
-      },
-      {
-        id: '2',
-        version: '1.0.8',
-        build: 3,
-        size: '43.4 MB',
-        downloads: 962,
-        updateTime: '2024-03-22 09:59',
-        description: '- 新增离私议功能',
-        isLatest: false
-      },
-      {
-        id: '3',
-        version: '1.0.8',
-        build: 2,
-        size: '43.4 MB',
-        downloads: 29,
-        updateTime: '2024-03-14 10:37',
-        description: '- 优化启动速度',
-        isLatest: false
-      },
-      {
-        id: '4',
-        version: '1.0.8',
-        build: 1,
-        size: '43.4 MB',
-        downloads: 23,
-        updateTime: '2024-03-08 18:47',
-        description: '- 首次发布',
-        isLatest: false
-      }
-    ]
-  },
-  {
-    id: '2',
-    name: '移动办公',
-    packageId: 'com.company.mobile.office',
-    color: '#10B981',
-    forceUpdate: false,
-    versions: [
-      {
-        id: '5',
-        version: '2.1.0',
-        build: 10,
-        size: '67.2 MB',
-        downloads: 2315,
-        updateTime: '2024-05-25 14:30',
-        description: '- 新增文档协作功能\n- 修复已知问题',
-        isLatest: true
-      }
-    ]
-  },
-  {
-    id: '3',
-    name: '人力资源管理',
-    packageId: 'com.company.hr.management',
-    color: '#F59E0B',
-    forceUpdate: false,
-    versions: [
-      {
-        id: '6',
-        version: '1.5.2',
-        build: 8,
-        size: '52.1 MB',
-        downloads: 891,
-        updateTime: '2024-05-20 10:15',
-        description: '- 优化考勤统计\n- 新增请假审批流程',
-        isLatest: true
-      }
-    ]
-  },
-  {
-    id: '4',
-    name: '客户关系',
-    packageId: 'com.company.crm.system',
-    color: '#EF4444',
-    forceUpdate: true,
-    versions: [
-      {
-        id: '7',
-        version: '3.0.1',
-        build: 15,
-        size: '78.5 MB',
-        downloads: 1567,
-        updateTime: '2024-05-18 16:45',
-        description: '- 重构客户管理模块\n- 提升性能表现',
-        isLatest: true
-      }
-    ]
-  },
-  {
-    id: '5',
-    name: '财务管理',
-    packageId: 'com.company.finance.manager',
-    color: '#8B5CF6',
-    forceUpdate: false,
-    versions: [
-      {
-        id: '8',
-        version: '2.3.0',
-        build: 12,
-        size: '45.8 MB',
-        downloads: 734,
-        updateTime: '2024-05-15 09:20',
-        description: '- 新增财务报表功能\n- 优化数据导出',
-        isLatest: true
-      }
-    ]
+// 加载应用数据
+const loadApps = async () => {
+  try {
+    loading.value = true
+    const response = await getAppList(0, 100) // 获取前100个应用
+    
+    // 转换数据格式
+    apps.value = response.content.map(item => ({
+      id: item.id.toString(),
+      name: item.appName,
+      packageId: item.appId,
+      color: generateColor(item.appName), // 生成颜色
+      forceUpdate: item.forceUpdate,
+      versions: [] // 暂时为空，需要时再加载
+    }))
+    
+    // 默认选择第一个应用
+    if (apps.value.length > 0) {
+      await selectApp(apps.value[0])
+    }
+  } catch (error) {
+    console.error('加载应用数据失败:', error)
+    ElMessage.error('加载应用数据失败，请重试')
+  } finally {
+    loading.value = false
   }
-])
+}
+
+// 生成应用颜色
+const generateColor = (name: string): string => {
+  const colors = [
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', 
+    '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'
+  ]
+  const index = name.charCodeAt(0) % colors.length
+  return colors[index]
+}
 
 // 计算属性
 const filteredApps = computed(() => {
@@ -487,8 +419,28 @@ const tableHeaderStyle = {
 }
 
 // 方法
-const selectApp = (app: AppInfo) => {
-  selectedApp.value = app
+const selectApp = async (app: AppInfo) => {
+  try {
+    selectedApp.value = app
+    
+    // 加载该应用的版本数据
+    const versionsResponse = await getAppVersions(app.packageId, 0, 100)
+    
+    // 转换版本数据格式
+    app.versions = versionsResponse.content.map(version => ({
+      id: version.id.toString(),
+      version: version.versionName,
+      build: version.versionCode,
+      size: formatFileSize(version.fileSize),
+      downloads: Math.floor(Math.random() * 5000), // 模拟下载次数
+      updateTime: version.updateTime.replace('T', ' ').slice(0, 16),
+      description: version.updateDescription || '暂无更新说明',
+      isReleased: version.isReleased
+    }))
+  } catch (error) {
+    console.error('加载版本数据失败:', error)
+    ElMessage.error('加载版本数据失败')
+  }
 }
 
 const handleCreateApp = () => {
@@ -503,8 +455,19 @@ const handleEditVersion = (version: AppVersion) => {
   ElMessage.info(`编辑版本 ${version.version} 功能开发中...`)
 }
 
-const handleForceUpdateChange = (value: boolean) => {
-  ElMessage.success(`强制更新已${value ? '开启' : '关闭'}`)
+const handleForceUpdateChange = async (value: boolean) => {
+  try {
+    if (selectedApp.value) {
+      await updateAppForceUpdate(selectedApp.value.packageId, value)
+      ElMessage.success(`强制更新已${value ? '开启' : '关闭'}`)
+    }
+  } catch (error) {
+    ElMessage.error('设置失败，请重试')
+    // 回滚UI状态
+    if (selectedApp.value) {
+      selectedApp.value.forceUpdate = !value
+    }
+  }
 }
 
 const handleLogout = () => {
@@ -525,10 +488,8 @@ const handleLogout = () => {
 
 // 生命周期
 onMounted(() => {
-  // 默认选择第一个应用
-  if (apps.value.length > 0) {
-    selectedApp.value = apps.value[0]
-  }
+  // 加载应用数据
+  loadApps()
 })
 
 // 上传新版本对话框相关
@@ -611,33 +572,60 @@ const removeSelectedFile = () => {
   }
 }
 
-const handleStartUpload = () => {
-  if (!selectedFile.value) {
+const handleStartUpload = async () => {
+  if (!selectedFile.value || !selectedApp.value) {
     ElMessage.error('请先选择APK文件')
     return
   }
   
-  uploading.value = true
-  uploadProgress.value = 0
-  uploadProgressText.value = '准备上传...'
-  
-  // 模拟上传进度
-  const interval = setInterval(() => {
-    uploadProgress.value += 10
-    uploadProgressText.value = `上传中... ${uploadProgress.value}%`
+  try {
+    uploading.value = true
+    uploadProgress.value = 0
+    uploadProgressText.value = '准备上传...'
     
-    if (uploadProgress.value >= 100) {
-      clearInterval(interval)
-      uploadProgressText.value = '上传完成'
-      ElMessage.success('APK文件上传成功！')
-      setTimeout(() => {
-        handleUploadDialogClose()
-        uploading.value = false
-        uploadProgress.value = 0
-        uploadProgressText.value = ''
-      }, 1500)
-    }
-  }, 200)
+    // 模拟上传进度更新
+    const progressInterval = setInterval(() => {
+      if (uploadProgress.value < 90) {
+        uploadProgress.value += 10
+        uploadProgressText.value = `上传中... ${uploadProgress.value}%`
+      }
+    }, 200)
+    
+    // 调用真实的上传API
+    const uploadedVersion = await uploadApk(
+      selectedFile.value,
+      selectedApp.value.packageId,
+      '通过前端上传', // 可以添加一个输入框让用户填写
+      false // 可以添加一个复选框让用户选择
+    )
+    
+    // 完成上传进度
+    clearInterval(progressInterval)
+    uploadProgress.value = 100
+    uploadProgressText.value = '上传完成'
+    
+    ElMessage.success('APK文件上传成功！')
+    
+    // 刷新当前应用的版本列表
+    await selectApp(selectedApp.value)
+    
+    // 关闭对话框
+    setTimeout(() => {
+      handleUploadDialogClose()
+      uploading.value = false
+      uploadProgress.value = 0
+      uploadProgressText.value = ''
+    }, 1500)
+    
+  } catch (error: any) {
+    console.error('上传失败:', error)
+    uploading.value = false
+    uploadProgress.value = 0
+    uploadProgressText.value = ''
+    
+    const errorMessage = error.response?.data?.message || error.message || '上传失败，请重试'
+    ElMessage.error(errorMessage)
+  }
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -648,6 +636,35 @@ const formatFileSize = (bytes: number): string => {
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+const handleSetReleaseVersion = async (version: AppVersion) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定将版本 ${version.version} 设为当前发布版本吗？移动端用户将会收到此版本的更新。`,
+      '确认发布',
+      {
+        confirmButtonText: '确定发布',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    if (selectedApp.value) {
+      await setReleaseVersion(selectedApp.value.packageId, parseInt(version.id))
+      
+      // 更新本地状态
+      selectedApp.value.versions.forEach(v => {
+        v.isReleased = v.id === version.id
+      })
+      
+      ElMessage.success('发布版本设置成功')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('设置失败，请重试')
+    }
+  }
 }
 </script>
 
@@ -1035,6 +1052,23 @@ const formatFileSize = (bytes: number): string => {
 }
 
 .edit-icon {
+  margin-right: 4px;
+  font-size: 14px;
+}
+
+.release-button {
+  color: #10B981;
+  padding: 4px 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.release-button:hover {
+  background: #EFF6FF;
+  color: #3B82F6;
+}
+
+.release-icon {
   margin-right: 4px;
   font-size: 14px;
 }
