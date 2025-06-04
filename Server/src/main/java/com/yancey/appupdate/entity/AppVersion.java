@@ -18,8 +18,7 @@ import java.time.LocalDateTime;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Entity
-@Table(name = "app_version", 
-       uniqueConstraints = @UniqueConstraint(columnNames = {"app_info_id", "version_code"}))
+@Table(name = "app_version")
 public class AppVersion {
 
     @Id
@@ -27,11 +26,10 @@ public class AppVersion {
     private Long id;
 
     /**
-     * 关联的应用信息
+     * 关联的应用ID（packageName）
      */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "app_info_id", nullable = false)
-    private AppInfo appInfo;
+    @Column(name = "app_id", nullable = false, length = 100)
+    private String appId;
 
     /**
      * 版本号（数字）

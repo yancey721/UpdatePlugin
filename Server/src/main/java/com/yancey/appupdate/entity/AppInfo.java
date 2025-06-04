@@ -22,14 +22,11 @@ import java.util.List;
 @Table(name = "app_info")
 public class AppInfo {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
     /**
-     * 应用ID（唯一标识）
+     * 应用ID（主键，使用packageName作为唯一标识）
      */
-    @Column(name = "app_id", unique = true, nullable = false, length = 100)
+    @Id
+    @Column(name = "app_id", length = 100)
     private String appId;
 
     /**
@@ -39,10 +36,11 @@ public class AppInfo {
     private String appName;
 
     /**
-     * 包名
+     * 应用描述
      */
-    @Column(name = "package_name", length = 200)
-    private String packageName;
+    @Lob
+    @Column(name = "app_description")
+    private String appDescription;
 
     /**
      * 是否强制更新
@@ -67,6 +65,6 @@ public class AppInfo {
     /**
      * 关联的版本列表
      */
-    @OneToMany(mappedBy = "appInfo", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "appId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<AppVersion> versions;
 } 

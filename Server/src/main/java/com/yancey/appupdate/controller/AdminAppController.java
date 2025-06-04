@@ -392,4 +392,39 @@ public class AdminAppController {
             return ResponseEntity.badRequest().body(ApiResponse.badRequest("查询失败: " + e.getMessage()));
         }
     }
+
+    /**
+     * 创建新应用
+     * 
+     * @param createRequest 创建应用请求
+     * @return 创建的应用信息
+     */
+    @PostMapping("/create")
+    public ResponseEntity<ApiResponse<AppInfoDto>> createApp(
+            @RequestBody @Valid com.yancey.appupdate.dto.CreateAppRequest createRequest) {
+        
+        try {
+            log.info("创建新应用: packageName={}, appName={}", 
+                    createRequest.getPackageName(), createRequest.getAppName());
+
+            com.yancey.appupdate.entity.AppInfo createdApp = appVersionService.createApp(
+                    createRequest.getPackageName(),
+                    createRequest.getAppName(),
+                    createRequest.getAppDescription(),
+                    createRequest.getForceUpdate()
+            );
+
+            AppInfoDto appInfoDto = appVersionService.convertToAppInfoDto(createdApp);
+
+            log.info("应用创建成功: appId={}, appName={}", 
+                    createdApp.getAppId(), createdApp.getAppName());
+
+            return ResponseEntity.ok(ApiResponse.success("应用创建成功", appInfoDto));
+            
+        } catch (Exception e) {
+            log.error("创建应用失败: packageName={}, error={}", 
+                    createRequest.getPackageName(), e.getMessage(), e);
+            return ResponseEntity.badRequest().body(ApiResponse.badRequest(e.getMessage()));
+        }
+    }
 } 

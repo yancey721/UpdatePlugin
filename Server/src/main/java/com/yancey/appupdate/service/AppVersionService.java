@@ -125,14 +125,13 @@ public class AppVersionService {
      * 查找或创建AppInfo
      */
     private AppInfo findOrCreateAppInfo(String appId, ParsedApkData parsedData) {
-        return appInfoRepository.findByAppId(appId)
+        return appInfoRepository.findById(appId)
                 .orElseGet(() -> {
                     AppInfo newAppInfo = new AppInfo();
                     newAppInfo.setAppId(appId);
                     newAppInfo.setAppName(StringUtils.hasText(parsedData.getAppName()) ? parsedData.getAppName() : appId);
-                    newAppInfo.setPackageName(parsedData.getPackageName());
-                    newAppInfo.setCreateTime(LocalDateTime.now());
-                    newAppInfo.setUpdateTime(LocalDateTime.now());
+                    newAppInfo.setAppDescription("通过APK上传自动创建");
+                    newAppInfo.setForceUpdate(false);
                     
                     AppInfo savedAppInfo = appInfoRepository.save(newAppInfo);
                     log.info("创建新应用: {} - {}", savedAppInfo.getAppId(), savedAppInfo.getAppName());
@@ -144,7 +143,7 @@ public class AppVersionService {
      * 检查版本是否已存在
      */
     private void checkVersionExists(AppInfo appInfo, Integer versionCode) {
-        if (appVersionRepository.existsByAppInfoAndVersionCode(appInfo, versionCode)) {
+        if (appVersionRepository.existsByAppIdAndVersionCode(appInfo.getAppId(), versionCode)) {
             throw new BusinessException(String.format("版本 %d 已存在，请使用不同的版本号", versionCode));
         }
     }
@@ -156,7 +155,7 @@ public class AppVersionService {
                                             String fileName, String downloadUrl, 
                                             String updateDescription, Boolean forceUpdate) {
         AppVersion appVersion = new AppVersion();
-        appVersion.setAppInfo(appInfo);
+        appVersion.setAppId(appInfo.getAppId());  // 直接设置appId字符串
         appVersion.setVersionCode(parsedData.getVersionCodeAsInt());
         appVersion.setVersionName(parsedData.getVersionName());
         appVersion.setFileSize(parsedData.getFileSize());
@@ -166,8 +165,6 @@ public class AppVersionService {
         appVersion.setUpdateDescription(updateDescription);
         appVersion.setForceUpdate(forceUpdate != null ? forceUpdate : false);
         appVersion.setIsReleased(false);
-        appVersion.setCreateTime(LocalDateTime.now());
-        appVersion.setUpdateTime(LocalDateTime.now());
         
         return appVersion;
     }
@@ -176,11 +173,15 @@ public class AppVersionService {
      * 转换为DTO
      */
     public AppVersionDto convertToDto(AppVersion appVersion) {
+        // 获取应用信息
+        AppInfo appInfo = appInfoRepository.findById(appVersion.getAppId())
+                .orElseThrow(() -> new BusinessException("找不到应用信息: " + appVersion.getAppId()));
+        
         AppVersionDto dto = new AppVersionDto();
         dto.setId(appVersion.getId());
-        dto.setAppId(appVersion.getAppInfo().getAppId());
-        dto.setAppName(appVersion.getAppInfo().getAppName());
-        dto.setPackageName(appVersion.getAppInfo().getPackageName());
+        dto.setAppId(appVersion.getAppId());
+        dto.setAppName(appInfo.getAppName());
+        dto.setPackageName(appVersion.getAppId()); // packageName就是appId
         dto.setVersionCode(appVersion.getVersionCode());
         dto.setVersionName(appVersion.getVersionName());
         dto.setFileSize(appVersion.getFileSize());
@@ -224,56 +225,54 @@ public class AppVersionService {
      */
     private AppInfoWithLatestVersionDto convertToAppInfoWithLatestVersionDto(AppInfo appInfo) {
         AppInfoWithLatestVersionDto dto = new AppInfoWithLatestVersionDto();
-        dto.setId(appInfo.getId());
+        dto.setId(null); // 不再使用数字ID
         dto.setAppId(appInfo.getAppId());
         dto.setAppName(appInfo.getAppName());
-        dto.setPackageName(appInfo.getPackageName());
+        dto.setPackageName(appInfo.getAppId()); // packageName就是appId
         dto.setForceUpdate(appInfo.getForceUpdate());
         dto.setCreateTime(appInfo.getCreateTime());
         dto.setUpdateTime(appInfo.getUpdateTime());
-        
-        // 统计版本总数
-        long totalVersionsLong = appVersionRepository.countByAppInfo(appInfo);
-        dto.setTotalVersions((int) totalVersionsLong);
-        
-        // 获取最新发布版本信息
-        appVersionRepository.findByAppInfo_AppIdAndIsReleasedTrue(appInfo.getAppId())
-            .ifPresent(latestVersion -> {
-                dto.setLatestVersionId(latestVersion.getId());
-                dto.setLatestVersionCode(latestVersion.getVersionCode());
-                dto.setLatestVersionName(latestVersion.getVersionName());
-                dto.setLatestFileSize(latestVersion.getFileSize());
-                dto.setLatestUpdateDescription(latestVersion.getUpdateDescription());
-                dto.setLatestForceUpdate(latestVersion.getForceUpdate());
-                dto.setLatestIsReleased(latestVersion.getIsReleased());
-                dto.setLatestVersionCreateTime(latestVersion.getCreateTime());
-            });
-        
+        dto.setTotalVersions((int) appVersionRepository.countByAppId(appInfo.getAppId()));
+
+        // 查找最新的发布版本
+        Optional<AppVersion> latestVersion = appVersionRepository.findByAppIdAndIsReleasedTrue(appInfo.getAppId());
+        if (latestVersion.isPresent()) {
+            AppVersion version = latestVersion.get();
+            dto.setLatestVersionId(version.getId());
+            dto.setLatestVersionCode(version.getVersionCode());
+            dto.setLatestVersionName(version.getVersionName());
+            dto.setLatestFileSize(version.getFileSize());
+            dto.setLatestUpdateDescription(version.getUpdateDescription());
+            dto.setLatestForceUpdate(version.getForceUpdate());
+            dto.setLatestIsReleased(version.getIsReleased());
+            dto.setLatestVersionCreateTime(version.getCreateTime());
+        }
+
         return dto;
     }
 
     /**
-     * 查询指定应用的版本列表（支持分页）
-     * 
-     * @param appId 应用ID
-     * @param pageable 分页参数
-     * @return 应用版本的分页列表
+     * 查询指定应用的版本列表
      */
     public Page<AppVersionDto> getAppVersions(String appId, Pageable pageable) {
-        log.info("查询应用版本列表: appId={}, 分页: {}", appId, pageable);
-        
-        // 根据appId查找AppInfo
-        AppInfo appInfo = appInfoRepository.findByAppId(appId)
-                .orElseThrow(() -> new BusinessException("应用ID不存在: " + appId));
-        
-        // 查询该应用的所有版本（按版本号倒序）
-        Page<AppVersion> versionsPage = appVersionRepository.findByAppInfoOrderByVersionCodeDesc(appInfo, pageable);
-        
-        log.info("查询应用版本列表成功: appId={}, 总数={}, 当前页={}, 每页大小={}", 
-                appId, versionsPage.getTotalElements(), versionsPage.getNumber(), versionsPage.getSize());
-        
-        // 转换为DTO
-        return versionsPage.map(this::convertToDto);
+        try {
+            log.info("查询应用版本列表: appId={}", appId);
+
+            // 验证应用是否存在
+            AppInfo appInfo = appInfoRepository.findById(appId)
+                    .orElseThrow(() -> new BusinessException("应用不存在: " + appId));
+
+            Page<AppVersion> versionsPage = appVersionRepository.findByAppIdOrderByVersionCodeDesc(appId, pageable);
+            
+            Page<AppVersionDto> dtoPage = versionsPage.map(this::convertToDto);
+
+            log.info("查询应用版本列表成功: appId={}, 总数={}", appId, dtoPage.getTotalElements());
+            return dtoPage;
+
+        } catch (Exception e) {
+            log.error("查询应用版本列表失败: appId={}, error={}", appId, e.getMessage(), e);
+            throw new BusinessException("查询应用版本列表失败: " + e.getMessage());
+        }
     }
 
     /**
@@ -439,62 +438,41 @@ public class AppVersionService {
     }
 
     /**
-     * 移动端检查更新（更新为发布版本逻辑）
-     * 
-     * @param appId 应用ID
-     * @param currentVersionCode 当前版本号
-     * @return 更新检查结果
+     * 检查更新
      */
     public com.yancey.appupdate.dto.CheckUpdateResponseDto checkUpdate(String appId, Integer currentVersionCode) {
-        log.info("检查更新: appId={}, currentVersionCode={}", appId, currentVersionCode);
-        
         try {
-            // 1. 查找应用信息
-            AppInfo appInfo = appInfoRepository.findByAppId(appId)
-                    .orElseThrow(() -> new BusinessException("应用ID不存在: " + appId));
+            log.info("检查更新: appId={}, currentVersionCode={}", appId, currentVersionCode);
+
+            // 验证应用是否存在
+            AppInfo appInfo = appInfoRepository.findById(appId)
+                    .orElseThrow(() -> new BusinessException("应用不存在: " + appId));
+
+            // 查找当前发布版本
+            Optional<AppVersion> releaseVersionOpt = appVersionRepository.findByAppIdAndIsReleasedTrue(appId);
             
-            // 2. 查找当前发布版本
-            Optional<AppVersion> releaseVersionOpt = appVersionRepository
-                    .findByAppInfo_AppIdAndIsReleasedTrue(appId);
-            
-            if (releaseVersionOpt.isEmpty()) {
-                log.info("无发布版本: appId={}, currentVersionCode={}", appId, currentVersionCode);
-                return com.yancey.appupdate.dto.CheckUpdateResponseDto.noUpdate();
+            if (!releaseVersionOpt.isPresent()) {
+                log.info("应用暂无发布版本: appId={}", appId);
+                return createNoUpdateResponse();
             }
-            
+
             AppVersion releaseVersion = releaseVersionOpt.get();
             
-            // 3. 比较版本号，只有发布版本的版本号大于当前版本号才需要更新
+            // 判断是否需要更新
             if (releaseVersion.getVersionCode() <= currentVersionCode) {
                 log.info("当前版本已是最新: appId={}, currentVersionCode={}, releaseVersionCode={}", 
                         appId, currentVersionCode, releaseVersion.getVersionCode());
-                return com.yancey.appupdate.dto.CheckUpdateResponseDto.noUpdate();
+                return createNoUpdateResponse();
             }
+
+            // 需要更新
+            log.info("发现新版本: appId={}, currentVersionCode={}, newVersionCode={}", 
+                    appId, currentVersionCode, releaseVersion.getVersionCode());
             
-            // 4. 构建更新响应（使用应用级别的强制更新设置）
-            com.yancey.appupdate.dto.CheckUpdateResponseDto response = 
-                    com.yancey.appupdate.dto.CheckUpdateResponseDto.hasUpdate(
-                            releaseVersion.getVersionName(),
-                            releaseVersion.getVersionCode(),
-                            releaseVersion.getUpdateDescription(),
-                            appInfo.getForceUpdate(), // 使用应用级别的强制更新设置
-                            releaseVersion.getDownloadUrl(),
-                            releaseVersion.getMd5(),
-                            releaseVersion.getFileSize()
-                    );
-            
-            log.info("发现更新: appId={}, currentVersionCode={} -> releaseVersionCode={}, forceUpdate={}", 
-                    appId, currentVersionCode, releaseVersion.getVersionCode(), appInfo.getForceUpdate());
-            
-            return response;
-            
-        } catch (BusinessException e) {
-            log.error("检查更新失败: appId={}, currentVersionCode={}, error={}", 
-                    appId, currentVersionCode, e.getMessage());
-            throw e;
+            return createUpdateResponse(releaseVersion, appInfo.getForceUpdate());
+
         } catch (Exception e) {
-            log.error("检查更新失败: appId={}, currentVersionCode={}, error={}", 
-                    appId, currentVersionCode, e.getMessage(), e);
+            log.error("检查更新失败: appId={}, currentVersionCode={}, error={}", appId, currentVersionCode, e.getMessage(), e);
             throw new BusinessException("检查更新失败: " + e.getMessage());
         }
     }
@@ -515,14 +493,14 @@ public class AppVersionService {
         log.info("设置发布版本: appId={}, versionId={}", appId, versionId);
         
         // 1. 验证应用和版本存在性
-        AppInfo appInfo = appInfoRepository.findByAppId(appId)
+        AppInfo appInfo = appInfoRepository.findById(appId)
                 .orElseThrow(() -> new IllegalArgumentException("应用不存在: " + appId));
         
         AppVersion targetVersion = appVersionRepository.findById(versionId)
                 .orElseThrow(() -> new IllegalArgumentException("版本不存在: " + versionId));
         
         // 2. 验证版本属于该应用
-        if (!targetVersion.getAppInfo().getId().equals(appInfo.getId())) {
+        if (!targetVersion.getAppId().equals(appInfo.getAppId())) {
             throw new IllegalArgumentException("版本不属于指定应用");
         }
         
@@ -551,7 +529,7 @@ public class AppVersionService {
     public AppInfoDto updateAppForceUpdate(String appId, Boolean forceUpdate) {
         log.info("更新应用强制更新设置: appId={}, forceUpdate={}", appId, forceUpdate);
         
-        AppInfo appInfo = appInfoRepository.findByAppId(appId)
+        AppInfo appInfo = appInfoRepository.findById(appId)
                 .orElseThrow(() -> new IllegalArgumentException("应用不存在: " + appId));
         
         appInfo.setForceUpdate(forceUpdate);
@@ -572,7 +550,7 @@ public class AppVersionService {
     public AppVersionDto getCurrentReleaseVersion(String appId) {
         log.info("获取当前发布版本: appId={}", appId);
         
-        Optional<AppVersion> releaseVersion = appVersionRepository.findByAppInfo_AppIdAndIsReleasedTrue(appId);
+        Optional<AppVersion> releaseVersion = appVersionRepository.findByAppIdAndIsReleasedTrue(appId);
         
         if (releaseVersion.isPresent()) {
             log.info("找到发布版本: appId={}, versionCode={}", appId, releaseVersion.get().getVersionCode());
@@ -592,7 +570,7 @@ public class AppVersionService {
     public List<AppVersion> validateReleaseVersionConsistency(String appId) {
         log.info("验证发布版本数据一致性: appId={}", appId);
         
-        List<AppVersion> releasedVersions = appVersionRepository.findByAppInfo_AppIdAndIsReleasedTrueOrderByVersionCodeDesc(appId);
+        List<AppVersion> releasedVersions = appVersionRepository.findByAppIdAndIsReleasedTrueOrderByVersionCodeDesc(appId);
         
         if (releasedVersions.size() > 1) {
             log.warn("发现多个发布版本，数据不一致: appId={}, count={}", appId, releasedVersions.size());
@@ -606,13 +584,66 @@ public class AppVersionService {
      */
     public AppInfoDto convertToAppInfoDto(AppInfo appInfo) {
         AppInfoDto dto = new AppInfoDto();
-        dto.setId(appInfo.getId());
+        dto.setId(null); // 不再使用数字ID
         dto.setAppId(appInfo.getAppId());
         dto.setAppName(appInfo.getAppName());
-        dto.setPackageName(appInfo.getPackageName());
+        dto.setPackageName(appInfo.getAppId()); // packageName就是appId
         dto.setForceUpdate(appInfo.getForceUpdate());
         dto.setCreateTime(appInfo.getCreateTime());
         dto.setUpdateTime(appInfo.getUpdateTime());
         return dto;
+    }
+
+    /**
+     * 创建新应用
+     * 
+     * @param packageName 包名（作为应用唯一标识）
+     * @param appName 应用名称
+     * @param appDescription 应用描述
+     * @param forceUpdate 是否强制更新
+     * @return 创建的应用信息
+     */
+    @Transactional
+    public AppInfo createApp(String packageName, String appName, String appDescription, Boolean forceUpdate) {
+        try {
+            // 1. 验证包名是否已存在
+            if (appInfoRepository.existsById(packageName)) {
+                throw new BusinessException("包名 " + packageName + " 已存在，请使用不同的包名");
+            }
+
+            // 2. 创建AppInfo实体
+            AppInfo appInfo = new AppInfo();
+            appInfo.setAppId(packageName);  // 使用packageName作为appId
+            appInfo.setAppName(appName);
+            appInfo.setAppDescription(appDescription);
+            appInfo.setForceUpdate(forceUpdate != null ? forceUpdate : false);
+
+            // 3. 保存到数据库
+            AppInfo savedAppInfo = appInfoRepository.save(appInfo);
+            log.info("应用创建成功: appId={}, appName={}", savedAppInfo.getAppId(), savedAppInfo.getAppName());
+
+            return savedAppInfo;
+
+        } catch (Exception e) {
+            log.error("创建应用失败: {}", e.getMessage(), e);
+            throw new BusinessException("创建应用失败: " + e.getMessage());
+        }
+    }
+
+    // 添加缺失的辅助方法
+    private com.yancey.appupdate.dto.CheckUpdateResponseDto createNoUpdateResponse() {
+        return com.yancey.appupdate.dto.CheckUpdateResponseDto.noUpdate();
+    }
+
+    private com.yancey.appupdate.dto.CheckUpdateResponseDto createUpdateResponse(AppVersion releaseVersion, Boolean forceUpdate) {
+        return com.yancey.appupdate.dto.CheckUpdateResponseDto.hasUpdate(
+                releaseVersion.getVersionName(),
+                releaseVersion.getVersionCode(),
+                releaseVersion.getUpdateDescription(),
+                forceUpdate, // 使用应用级别的强制更新设置
+                releaseVersion.getDownloadUrl(),
+                releaseVersion.getMd5(),
+                releaseVersion.getFileSize()
+        );
     }
 } 

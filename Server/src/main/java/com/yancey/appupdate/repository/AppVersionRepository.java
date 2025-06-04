@@ -1,6 +1,5 @@
 package com.yancey.appupdate.repository;
 
-import com.yancey.appupdate.entity.AppInfo;
 import com.yancey.appupdate.entity.AppVersion;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,34 +23,34 @@ import java.util.Optional;
 public interface AppVersionRepository extends JpaRepository<AppVersion, Long> {
 
     // ===========================================
-    // 发布版本管理相关方法（新增）
+    // 发布版本管理相关方法
     // ===========================================
 
     /**
      * 查找应用的当前发布版本
      * 
-     * @param appId 应用ID
+     * @param appId 应用ID（packageName）
      * @return 发布版本
      */
-    Optional<AppVersion> findByAppInfo_AppIdAndIsReleasedTrue(String appId);
+    Optional<AppVersion> findByAppIdAndIsReleasedTrue(String appId);
 
     /**
      * 批量更新应用的所有版本为非发布状态
      * 
-     * @param appId 应用ID
+     * @param appId 应用ID（packageName）
      * @return 更新的记录数
      */
     @Modifying
-    @Query(value = "UPDATE app_version SET is_released = false WHERE app_info_id = (SELECT id FROM app_info WHERE app_id = :appId)", nativeQuery = true)
+    @Query("UPDATE AppVersion av SET av.isReleased = false WHERE av.appId = :appId")
     int updateAllVersionsToNonReleased(@Param("appId") String appId);
 
     /**
      * 查找应用的所有发布版本（用于验证数据一致性）
      * 
-     * @param appId 应用ID
+     * @param appId 应用ID（packageName）
      * @return 发布版本列表
      */
-    List<AppVersion> findByAppInfo_AppIdAndIsReleasedTrueOrderByVersionCodeDesc(String appId);
+    List<AppVersion> findByAppIdAndIsReleasedTrueOrderByVersionCodeDesc(String appId);
 
     /**
      * 统计发布版本数量
@@ -61,44 +60,44 @@ public interface AppVersionRepository extends JpaRepository<AppVersion, Long> {
     long countByIsReleasedTrue();
 
     // ===========================================
-    // 原有方法（保持兼容性）
+    // 应用版本基础查询方法
     // ===========================================
 
     /**
-     * 根据应用信息和版本号查找版本
+     * 根据应用ID和版本号查找版本
      * 
-     * @param appInfo 应用信息
+     * @param appId 应用ID（packageName）
      * @param versionCode 版本号
      * @return 应用版本
      */
-    Optional<AppVersion> findByAppInfoAndVersionCode(AppInfo appInfo, Integer versionCode);
+    Optional<AppVersion> findByAppIdAndVersionCode(String appId, Integer versionCode);
 
     /**
      * 查找指定应用的所有版本，按版本号倒序排列
      * 
-     * @param appInfo 应用信息
+     * @param appId 应用ID（packageName）
      * @param pageable 分页参数
      * @return 应用版本分页列表
      */
-    Page<AppVersion> findByAppInfoOrderByVersionCodeDesc(AppInfo appInfo, Pageable pageable);
+    Page<AppVersion> findByAppIdOrderByVersionCodeDesc(String appId, Pageable pageable);
 
     /**
      * 查找指定应用的所有版本，按创建时间倒序排列
      * 
-     * @param appInfo 应用信息
+     * @param appId 应用ID（packageName）
      * @param pageable 分页参数
      * @return 应用版本分页列表
      */
-    Page<AppVersion> findByAppInfoOrderByCreateTimeDesc(AppInfo appInfo, Pageable pageable);
+    Page<AppVersion> findByAppIdOrderByCreateTimeDesc(String appId, Pageable pageable);
 
     /**
      * 检查指定应用和版本号的版本是否存在
      * 
-     * @param appInfo 应用信息
+     * @param appId 应用ID（packageName）
      * @param versionCode 版本号
      * @return 是否存在
      */
-    boolean existsByAppInfoAndVersionCode(AppInfo appInfo, Integer versionCode);
+    boolean existsByAppIdAndVersionCode(String appId, Integer versionCode);
 
     /**
      * 根据APK路径查找版本
@@ -111,10 +110,10 @@ public interface AppVersionRepository extends JpaRepository<AppVersion, Long> {
     /**
      * 统计指定应用的版本数量
      * 
-     * @param appInfo 应用信息
+     * @param appId 应用ID（packageName）
      * @return 版本数量
      */
-    long countByAppInfo(AppInfo appInfo);
+    long countByAppId(String appId);
 
     /**
      * 统计强制更新的版本数量

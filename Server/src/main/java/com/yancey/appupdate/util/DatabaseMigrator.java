@@ -14,86 +14,66 @@ public class DatabaseMigrator {
         
         try (Connection conn = DriverManager.getConnection(url, user, password)) {
             executeMigration(conn);
-            System.out.println("数据库迁移完成！");
+            System.out.println("数据库重构完成！");
         } catch (SQLException e) {
-            System.err.println("数据库迁移失败: " + e.getMessage());
+            System.err.println("数据库重构失败: " + e.getMessage());
             e.printStackTrace();
         }
     }
     
     private static void executeMigration(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            // 首先检查表是否存在，如果不存在就创建
+            
+            // 清空所有测试数据
+            System.out.println("清空测试数据...");
             try {
-                stmt.execute("SELECT COUNT(*) FROM app_info");
-                System.out.println("app_info 表已存在");
-                
-                // 检查并添加 force_update 字段
-                try {
-                    stmt.execute("SELECT force_update FROM app_info LIMIT 1");
-                    System.out.println("force_update 字段已存在");
-                } catch (SQLException e) {
-                    System.out.println("添加 force_update 字段...");
-                    stmt.execute("ALTER TABLE app_info ADD COLUMN force_update BOOLEAN DEFAULT FALSE");
-                }
-                
+                stmt.execute("DROP TABLE IF EXISTS app_version");
+                stmt.execute("DROP TABLE IF EXISTS app_info");
+                System.out.println("已清空所有表");
             } catch (SQLException e) {
-                System.out.println("创建 app_info 表...");
-                stmt.execute("CREATE TABLE app_info (" +
-                    "id BIGINT AUTO_INCREMENT PRIMARY KEY," +
-                    "app_id VARCHAR(100) NOT NULL UNIQUE," +
-                    "app_name VARCHAR(100) NOT NULL," +
-                    "package_name VARCHAR(100) NOT NULL," +
-                    "force_update BOOLEAN DEFAULT FALSE," +
-                    "create_time TIMESTAMP," +
-                    "update_time TIMESTAMP" +
-                    ")");
+                System.out.println("表不存在，跳过清空");
             }
             
-            try {
-                stmt.execute("SELECT COUNT(*) FROM app_version");
-                System.out.println("app_version 表已存在");
-                
-                // 检查并删除 status 字段（如果存在）
-                try {
-                    stmt.execute("SELECT status FROM app_version LIMIT 1");
-                    System.out.println("删除 status 字段...");
-                    stmt.execute("ALTER TABLE app_version DROP COLUMN status");
-                } catch (SQLException e) {
-                    System.out.println("status 字段不存在或已删除");
-                }
-                
-                // 检查并添加 is_released 字段
-                try {
-                    stmt.execute("SELECT is_released FROM app_version LIMIT 1");
-                    System.out.println("is_released 字段已存在");
-                } catch (SQLException e) {
-                    System.out.println("添加 is_released 字段...");
-                    stmt.execute("ALTER TABLE app_version ADD COLUMN is_released BOOLEAN DEFAULT FALSE");
-                }
-                
-            } catch (SQLException e) {
-                System.out.println("创建 app_version 表...");
-                stmt.execute("CREATE TABLE app_version (" +
-                    "id BIGINT AUTO_INCREMENT PRIMARY KEY," +
-                    "app_info_id BIGINT NOT NULL," +
-                    "version_code INT NOT NULL," +
-                    "version_name VARCHAR(50) NOT NULL," +
-                    "file_size BIGINT NOT NULL," +
-                    "md5 VARCHAR(32) NOT NULL," +
-                    "apk_path VARCHAR(200) NOT NULL," +
-                    "download_url VARCHAR(500) NOT NULL," +
-                    "update_description TEXT," +
-                    "force_update BOOLEAN DEFAULT FALSE," +
-                    "is_released BOOLEAN DEFAULT FALSE," +
-                    "create_time TIMESTAMP," +
-                    "update_time TIMESTAMP," +
-                    "FOREIGN KEY (app_info_id) REFERENCES app_info(id) ON DELETE CASCADE," +
-                    "UNIQUE KEY unique_app_version (app_info_id, version_code)" +
-                    ")");
-            }
+            // 创建新的 app_info 表结构（使用 app_id 作为主键）
+            System.out.println("创建新的 app_info 表...");
+            stmt.execute("CREATE TABLE app_info (" +
+                "app_id VARCHAR(100) PRIMARY KEY," +  // 直接使用 packageName 作为主键
+                "app_name VARCHAR(200) NOT NULL," +
+                "app_description TEXT," +              // 添加应用描述字段
+                "force_update BOOLEAN DEFAULT FALSE," +
+                "create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                "update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                ")");
             
-            System.out.println("数据库结构验证完成");
+            // 创建新的 app_version 表结构（外键直接引用 app_id）
+            System.out.println("创建新的 app_version 表...");
+            stmt.execute("CREATE TABLE app_version (" +
+                "id BIGINT AUTO_INCREMENT PRIMARY KEY," +
+                "app_id VARCHAR(100) NOT NULL," +      // 直接引用 app_info.app_id
+                "version_code INT NOT NULL," +
+                "version_name VARCHAR(50) NOT NULL," +
+                "file_size BIGINT NOT NULL," +
+                "md5 VARCHAR(32) NOT NULL," +
+                "apk_path VARCHAR(500) NOT NULL," +
+                "download_url VARCHAR(500) NOT NULL," +
+                "update_description TEXT," +
+                "force_update BOOLEAN DEFAULT FALSE," +
+                "is_released BOOLEAN DEFAULT FALSE," +
+                "create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                "update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                "FOREIGN KEY (app_id) REFERENCES app_info(app_id) ON DELETE CASCADE" +
+                ")");
+            
+            // 添加唯一约束
+            System.out.println("添加唯一约束...");
+            stmt.execute("CREATE UNIQUE INDEX unique_app_version ON app_version (app_id, version_code)");
+            
+            System.out.println("数据库重构完成！");
+            System.out.println("新结构说明：");
+            System.out.println("- app_info.app_id 现在是主键，直接使用 packageName");
+            System.out.println("- app_version.app_id 直接引用 app_info.app_id");
+            System.out.println("- 添加了 app_description 字段用于应用描述");
+            System.out.println("- 所有测试数据已清空");
         }
     }
 } 
