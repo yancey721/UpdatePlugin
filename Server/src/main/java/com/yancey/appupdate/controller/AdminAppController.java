@@ -32,6 +32,18 @@ public class AdminAppController {
     private final AppVersionService appVersionService;
 
     /**
+     * 管理端API密钥验证端点
+     * 用于验证API密钥是否有效
+     * 
+     * @return 验证结果
+     */
+    @GetMapping("/ping")
+    public ResponseEntity<ApiResponse<String>> ping() {
+        log.info("管理端API密钥验证");
+        return ResponseEntity.ok(ApiResponse.success("API密钥验证成功", "pong"));
+    }
+
+    /**
      * 处理参数验证异常
      */
     @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)

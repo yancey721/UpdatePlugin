@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>应用管理原型</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f9;
+            color: #333;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 280px;
+            background-color: #ffffff;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+        }
+
+        .search-bar {
+            display: flex;
+            align-items: center;
+            background-color: #f0f2f5;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 15px;
+        }
+
+        .search-bar i {
+            color: #888;
+            margin-right: 8px;
+        }
+
+        .search-bar input {
+            flex-grow: 1;
+            border: none;
+            outline: none;
+            background-color: transparent;
+            font-size: 14px;
+        }
+
+        .add-app-button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            transition: background-color 0.2s ease;
+        }
+
+        .add-app-button i {
+            margin-right: 8px;
+        }
+
+        .add-app-button:hover {
+            background-color: #0056b3;
+        }
+
+        .app-list-header {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            padding-left: 5px;
+        }
+        
+        .app-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+        }
+
+        .app-list li {
+            display: flex;
+            align-items: center;
+            padding: 12px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            margin-bottom: 5px;
+        }
+
+        .app-list li:hover, .app-list li.active {
+            background-color: #e6f7ff;
+            color: #1890ff;
+        }
+        
+        .app-list li.active {
+            font-weight: 600;
+        }
+
+        .app-list li i {
+            font-size: 20px;
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .app-icon-placeholder {
+            width: 24px;
+            height: 24px;
+            background-color: #ddd;
+            border-radius: 4px;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .app-list li span {
+            font-size: 15px;
+        }
+
+        .main-content {
+            flex-grow: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background-color: #f9fafb;
+        }
+
+        .app-detail-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .app-detail-header .app-icon-large {
+            width: 72px;
+            height: 72px;
+            background-color: #007bff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            font-size: 36px;
+            margin-right: 20px;
+            box-shadow: 0 4px 8px rgba(0,123,255,0.2);
+        }
+
+        .app-detail-header .info {
+            flex-grow: 1;
+        }
+
+        .app-detail-header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+        }
+
+        .app-detail-header p {
+            font-size: 13px;
+            color: #666;
+            margin: 2px 0;
+        }
+        
+        .app-detail-header p .label {
+            font-weight: 500;
+            color: #444;
+        }
+
+        .app-detail-header p a {
+            color: #007bff;
+            text-decoration: none;
+        }
+         .app-detail-header p a:hover {
+            text-decoration: underline;
+        }
+
+
+        .upload-button {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+        }
+        .upload-button i {
+            margin-right: 8px;
+        }
+
+        .upload-button:hover {
+            background-color: #218838;
+        }
+        
+        .section-card {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .section-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .settings-item:last-child {
+            border-bottom: none;
+        }
+        
+        .settings-item .label {
+            font-size: 14px;
+            color: #333;
+        }
+        
+        /* Basic toggle switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 40px; /* Reduced size */
+            height: 20px; /* Reduced size */
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 20px; /* Adjusted for new height */
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px; /* Reduced size */
+            width: 16px; /* Reduced size */
+            left: 2px; /* Adjusted for new height */
+            bottom: 2px; /* Adjusted for new height */
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #28a745;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px); /* Adjusted for new width */
+        }
+
+
+        .version-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .version-table th, .version-table td {
+            text-align: left;
+            padding: 12px 8px;
+            font-size: 13px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .version-table th {
+            background-color: #f9fafb;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        .version-table td .current-version-tag {
+            background-color: #e6fffb;
+            color: #08979c;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 5px;
+        }
+
+        .action-button {
+            background-color: #f0f2f5;
+            color: #333;
+            padding: 6px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .action-button:hover {
+            background-color: #e0e0e0;
+            border-color: #c0c0c0;
+        }
+        .action-button i {
+            margin-right: 4px; /* Icon on the left */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="search-bar">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="搜索您的应用">
+        </div>
+        
+        <button class="add-app-button">
+            <i class="fas fa-plus-circle"></i> 新建应用
+        </button>
+
+        <div class="app-list-header">所有应用</div>
+        <ul class="app-list">
+            <li class="active">
+                <div class="app-icon-placeholder" style="background-color: #007bff;">AS</div>
+                <span>掌上信手书</span>
+            </li>
+            <li>
+                <div class="app-icon-placeholder" style="background-color: #28a745;">OA</div>
+                <span>移动办公</span>
+            </li>
+            <li>
+                <div class="app-icon-placeholder" style="background-color: #ffc107;">HR</div>
+                <span>人力资源管理</span>
+            </li>
+            <li>
+                <div class="app-icon-placeholder" style="background-color: #dc3545;">CRM</div>
+                <span>客户关系</span>
+            </li>
+             <li>
+                <div class="app-icon-placeholder" style="background-color: #17a2b8;">FM</div>
+                <span>财务管理</span>
+            </li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="app-detail-header">
+            <div class="app-icon-large">
+                <i class="fas fa-signature"></i>
+            </div>
+            <div class="info">
+                <h1>掌上信手书</h1>
+                <p><span class="label">Package ID:</span> cn.org.bjca.signet.unify.app</p>
+            </div>
+            <button class="upload-button">
+                <i class="fas fa-upload"></i> 上传新版本
+            </button>
+        </div>
+
+        <div class="section-card">
+            <div class="section-header">
+                <h2>安装设置</h2>
+            </div>
+            <div class="settings-item">
+                <span class="label">是否强制更新</span>
+                 <label class="toggle-switch">
+                    <input type="checkbox" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="section-header">
+                <h2>版本列表</h2>
+            </div>
+            <table class="version-table">
+                <thead>
+                    <tr>
+                        <th>版本</th>
+                        <th>Build</th>
+                        <th>大小</th>
+                        <th>下载次数</th>
+                        <th>更新时间</th>
+                        <th>更新说明</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1.0.8_yhca <span class="current-version-tag">当前最新版本</span></td>
+                        <td>4</td>
+                        <td>43.4 MB</td>
+                        <td>6,008</td>
+                        <td>2024-05-30 19:46</td>
+                        <td>- 修复已知BUG<br>- 优化用户体验</td>
+                        <td><button class="action-button"><i class="fas fa-edit"></i> 编辑</button></td>
+                    </tr>
+                    <tr>
+                        <td>1.0.8</td>
+                        <td>3</td>
+                        <td>43.4 MB</td>
+                        <td>962</td>
+                        <td>2024-03-22 09:59</td>
+                        <td>- 新增隐私协议弹窗</td>
+                        <td><button class="action-button"><i class="fas fa-edit"></i> 编辑</button></td>
+                    </tr>
+                    <tr>
+                        <td>1.0.8</td>
+                        <td>2</td>
+                        <td>43.4 MB</td>
+                        <td>29</td>
+                        <td>2024-03-14 10:37</td>
+                        <td>- 优化启动速度</td>
+                        <td><button class="action-button"><i class="fas fa-edit"></i> 编辑</button></td>
+                    </tr>
+                    <tr>
+                        <td>1.0.8</td>
+                        <td>1</td>
+                        <td>43.4 MB</td>
+                        <td>23</td>
+                        <td>2024-03-08 18:47</td>
+                        <td>- 首次发布</td>
+                        <td><button class="action-button"><i class="fas fa-edit"></i> 编辑</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Simple script to handle active app selection
+        const appItems = document.querySelectorAll('.app-list li');
+        appItems.forEach(item => {
+            item.addEventListener('click', () => {
+                appItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                // In a real app, you would load the selected app's data here.
+                // For this prototype, we just change the active state.
+                const appName = item.querySelector('span').textContent;
+                document.querySelector('.app-detail-header h1').textContent = appName;
+                 // You could also change the icon and other details.
+                // For simplicity, we're just updating the name.
+                // Update displayed Package ID (example)
+                let packageId = "cn.org.bjca.signet.unify.app"; // Default
+                if(appName === '移动办公') packageId = "com.example.mobileoffice";
+                else if (appName === '人力资源管理') packageId = "com.example.hrsystem";
+                else if (appName === '客户关系') packageId = "com.example.crm";
+                else if (appName === '财务管理') packageId = "com.example.finance";
+                
+                document.querySelector('.app-detail-header .info p').innerHTML = `<span class="label">Package ID:</span> ${packageId}`;
+
+                if(appName === '掌上信手书'){
+                    document.querySelector('.app-detail-header .app-icon-large i').className = 'fas fa-signature';
+                } else if (appName === '移动办公'){
+                     document.querySelector('.app-detail-header .app-icon-large i').className = 'fas fa-briefcase';
+                } else if (appName === '人力资源管理'){
+                     document.querySelector('.app-detail-header .app-icon-large i').className = 'fas fa-users-cog';
+                } else if (appName === '客户关系'){
+                     document.querySelector('.app-detail-header .app-icon-large i').className = 'fas fa-handshake';
+                } else if (appName === '财务管理'){
+                     document.querySelector('.app-detail-header .app-icon-large i').className = 'fas fa-file-invoice-dollar';
+                }
+
+            });
+        });
+    </script>
+</body>
+</html> 

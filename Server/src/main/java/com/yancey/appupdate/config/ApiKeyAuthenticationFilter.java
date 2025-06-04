@@ -33,7 +33,6 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String API_KEY_HEADER = "X-API-KEY";
     private static final String ADMIN_API_PATH_PREFIX = "/api/admin";
-    private static final String PING_ENDPOINT = "/api/admin/app/ping";
     
     private final AppProperties appProperties;
 
@@ -50,13 +49,6 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         // 跳过CORS预检请求
         if ("OPTIONS".equalsIgnoreCase(method)) {
             log.debug("CORS预检请求，跳过认证: {} {}", method, requestURI);
-            filterChain.doFilter(request, response);
-            return;
-        }
-        
-        // 跳过ping端点
-        if (PING_ENDPOINT.equals(requestURI)) {
-            log.debug("Ping端点请求，跳过认证: {}", requestURI);
             filterChain.doFilter(request, response);
             return;
         }

@@ -1,156 +1,121 @@
-import api from './api'
+import api, { updateBaseURL } from './api'
 import type { ApiResponse } from './api'
-import type { AppInfo, AppVersion, PageResponse } from '../stores/app'
-import axios from 'axios'
 
-// 验证API密钥
+/**
+ * 验证API密钥
+ * @param apiKey API密钥
+ * @param serverUrl 服务器地址（可选）
+ * @returns 是否验证成功
+ */
 export const validateApiKey = async (apiKey: string, serverUrl?: string): Promise<boolean> => {
   try {
-    console.log('开始验证API密钥...')
-    
-    const baseURL = serverUrl || 'http://localhost:8080'
-    
-    // 临时创建一个axios实例来测试API密钥
-    const testApi = axios.create({
-      baseURL,
-      timeout: 10000
-    })
-    
-    // 先测试连接性（不需要API密钥）
-    try {
-      console.log('测试服务器连接...')
-      await testApi.get('/api/public/ping')
-      console.log('服务器连接正常')
-    } catch (connectionError: any) {
-      console.error('服务器连接失败:', connectionError.message)
-      throw new Error('无法连接到服务器，请检查服务器地址和网络连接')
+    // 如果提供了服务器地址，更新baseURL
+    if (serverUrl) {
+      updateBaseURL(serverUrl)
     }
     
-    // 再测试API密钥验证
-    console.log('验证API密钥...')
-    const response = await testApi.get<ApiResponse<any>>('/api/admin/app/stats', {
+    // 临时设置API密钥到请求头
+    const response = await api.get<ApiResponse<string>>('/api/admin/app/ping', {
       headers: {
         'X-API-KEY': apiKey
       }
     })
     
-    console.log('API密钥验证成功')
+    // 检查响应是否成功
     return response.data.code === 200
   } catch (error: any) {
-    console.error('API密钥验证失败:', error.message)
+    console.error('API密钥验证失败:', error)
     
-    // 如果已经抛出了连接错误，直接重新抛出
-    if (error.message.includes('无法连接到服务器')) {
-      throw error
-    }
-    
-    // 如果是401或403错误，说明API密钥无效
+    // 如果是401或403错误，说明密钥无效
     if (error.response?.status === 401 || error.response?.status === 403) {
-      console.error('API密钥无效，状态码:', error.response.status)
       return false
     }
     
-    // 其他错误也返回false
-    console.error('其他验证错误:', error.response?.status || 'unknown')
-    return false
+    // 其他错误也视为验证失败
+    throw new Error(error.response?.data?.message || '服务器连接失败，请检查服务器地址')
   }
 }
 
-// 查询应用列表
-export const getApps = async (params: {
-  appNameQuery?: string
-  page?: number
-  size?: number
-  sort?: string
-}): Promise<PageResponse<AppInfo>> => {
-  const response = await api.get<ApiResponse<PageResponse<AppInfo>>>('/api/admin/app/apps', {
-    params: {
-      appNameQuery: params.appNameQuery,
-      page: params.page || 0,
-      size: params.size || 10,
-      sort: params.sort || 'createTime,desc'
-    }
-  })
-  return response.data.data
-}
-
-// 查询应用版本列表
-export const getAppVersions = async (
-  appId: string,
-  params: {
-    page?: number
-    size?: number
-    sort?: string
+/**
+ * 获取应用列表
+ * @param page 页码
+ * @param size 每页大小
+ * @param appNameQuery 应用名称查询条件
+ * @returns 应用列表
+ */
+export const getAppList = async (page: number = 0, size: number = 10, appNameQuery?: string) => {
+  const params: any = { page, size }
+  if (appNameQuery) {
+    params.appNameQuery = appNameQuery
   }
-): Promise<PageResponse<AppVersion>> => {
-  const response = await api.get<ApiResponse<PageResponse<AppVersion>>>(
-    `/api/admin/app/app/${appId}/versions`,
-    {
-      params: {
-        page: params.page || 0,
-        size: params.size || 10,
-        sort: params.sort || 'versionCode,desc'
-      }
-    }
-  )
-  return response.data.data
+  
+  const response = await api.get<ApiResponse<any>>('/api/admin/app/list', { params })
+  return response.data
 }
 
-// 上传APK文件
-export const uploadApk = async (formData: FormData): Promise<AppVersion> => {
-  const response = await api.post<ApiResponse<AppVersion>>('/api/admin/app/upload', formData, {
+/**
+ * 上传APK文件
+ * @param file APK文件
+ * @param appId 应用ID
+ * @param updateDescription 更新说明
+ * @param forceUpdate 是否强制更新
+ * @returns 上传结果
+ */
+export const uploadApk = async (
+  file: File, 
+  appId: string, 
+  updateDescription?: string, 
+  forceUpdate: boolean = false
+) => {
+  const formData = new FormData()
+  formData.append('apkFile', file)
+  formData.append('appId', appId)
+  if (updateDescription) {
+    formData.append('updateDescription', updateDescription)
+  }
+  formData.append('forceUpdate', forceUpdate.toString())
+  
+  const response = await api.post<ApiResponse<any>>('/api/admin/app/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
     }
   })
-  return response.data.data
+  return response.data
 }
 
-// 更新应用版本信息
-export const updateAppVersion = async (
-  versionId: number,
-  data: {
-    updateDescription?: string
-    forceUpdate?: boolean
-    status?: number
-  }
-): Promise<AppVersion> => {
-  const response = await api.put<ApiResponse<AppVersion>>(
-    `/api/admin/app/version/${versionId}`,
-    data
-  )
-  return response.data.data
-}
-
-// 删除应用版本
-export const deleteAppVersion = async (versionId: number, forceDelete = true): Promise<void> => {
-  await api.delete(`/api/admin/app/version/${versionId}`, {
-    params: { forceDelete }
+/**
+ * 获取应用版本列表
+ * @param appId 应用ID
+ * @param page 页码
+ * @param size 每页大小
+ * @returns 版本列表
+ */
+export const getAppVersions = async (appId: string, page: number = 0, size: number = 10) => {
+  const response = await api.get<ApiResponse<any>>(`/api/admin/app/${appId}/versions`, {
+    params: { page, size }
   })
+  return response.data
 }
 
-// 更新版本状态
-export const updateVersionStatus = async (
-  versionId: number,
-  status: number
-): Promise<AppVersion> => {
-  const response = await api.put<ApiResponse<AppVersion>>(
-    `/api/admin/app/version/${versionId}/status`,
-    { status }
-  )
-  return response.data.data
+/**
+ * 更新版本状态
+ * @param versionId 版本ID
+ * @param status 状态（0-禁用，1-启用）
+ * @returns 更新结果
+ */
+export const updateVersionStatus = async (versionId: number, status: number) => {
+  const response = await api.put<ApiResponse<any>>(`/api/admin/app/version/${versionId}/status`, {
+    status
+  })
+  return response.data
 }
 
-// 获取统计信息
-export const getStats = async (): Promise<{
-  totalApps: number
-  totalVersions: number
-  totalSize: number
-}> => {
-  const response = await api.get<ApiResponse<{
-    totalApps: number
-    totalVersions: number
-    totalSize: number
-  }>>('/api/admin/app/stats')
-  return response.data.data
+/**
+ * 删除版本
+ * @param versionId 版本ID
+ * @returns 删除结果
+ */
+export const deleteVersion = async (versionId: number) => {
+  const response = await api.delete<ApiResponse<any>>(`/api/admin/app/version/${versionId}`)
+  return response.data
 } 
