@@ -17,6 +17,19 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin',
+    redirect: '/admin/apps'
+  },
+  {
+    path: '/admin/apps',
+    name: 'AppManagement',
+    component: () => import('../views/AppManagementView.vue'),
+    meta: {
+      title: '应用管理',
+      requiresAuth: true
+    }
+  },
+  {
     path: '/:pathMatch(.*)*', // Catch-all route for 404, redirect to login
     redirect: '/login'
   }
@@ -35,12 +48,8 @@ router.beforeEach((to, from, next) => {
     // 需要认证但没有API Key，跳转到登录页
     next('/login')
   } else if (to.path === '/login' && apiKey) {
-    // 已登录用户访问登录页，应该跳转到他们登录后应该去的页面
-    // 由于其他页面已删除，暂时也跳转到 /login，或者可以考虑显示一个已登录提示
-    // 为了简单起见，暂时不做重定向，允许已登录用户再次看到登录页
-    // 若要强制跳转，可以设置一个登录后的默认页，比如 /dashboard (如果未来会添加)
-    // next('/dashboard'); // 示例
-    next() 
+    // 已登录用户访问登录页，跳转到应用管理页
+    next('/admin/apps')
   } else {
     next()
   }
