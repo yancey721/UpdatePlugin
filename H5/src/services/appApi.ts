@@ -176,4 +176,35 @@ export const updateVersionStatus = async (versionId: number, status: number): Pr
 export const deleteVersion = async (versionId: number): Promise<void> => {
   const response = await api.delete<ApiResponse<void>>(`/api/admin/app/version/${versionId}`)
   return response.data.data
+}
+
+/**
+ * 删除应用版本
+ * @param versionId 版本ID
+ * @param forceDelete 是否强制删除
+ * @returns 删除结果
+ */
+export const deleteAppVersion = async (
+  versionId: number,
+  forceDelete: boolean = false
+): Promise<void> => {
+  await api.delete(`/api/admin/app/version/${versionId}`, {
+    params: { forceDelete }
+  })
+}
+
+/**
+ * 更新版本信息
+ * @param versionId 版本ID
+ * @param updateDescription 更新说明
+ * @returns 更新结果
+ */
+export const updateAppVersion = async (
+  versionId: number,
+  updateDescription: string
+): Promise<AppVersion> => {
+  const response = await api.put<ApiResponse<AppVersion>>(`/api/admin/app/version/${versionId}`, {
+    updateDescription
+  })
+  return response.data.data
 } 

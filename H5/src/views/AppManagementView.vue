@@ -180,19 +180,6 @@
               <el-table-column label="操作" width="200" align="left" header-align="left">
                 <template #default="{ row }">
                   <el-button 
-                    v-if="!row.isReleased"
-                    type="success" 
-                    link
-                    class="release-button"
-                    @click="handleSetReleaseVersion(row)"
-                  >
-                    <el-icon class="release-icon">
-                      <Check />
-                    </el-icon>
-                    设为发布版本
-                  </el-button>
-                  
-                  <el-button 
                     type="primary" 
                     link
                     class="edit-button"
@@ -222,88 +209,181 @@
     <!-- 上传新版本对话框 -->
     <el-dialog
       v-model="uploadDialogVisible"
-      title="上传新版本"
+      :title="isEditMode ? '编辑版本' : (showApkInfoStep ? '确认发布版本' : '上传新版本')"
       width="600px"
       :before-close="handleUploadDialogClose"
     >
       <div class="upload-container">
-        <!-- 文件上传区域 -->
-        <div 
-          class="upload-area"
-          :class="{ 'upload-area-dragover': isDragOver }"
-          @drop="handleFileDrop"
-          @dragover.prevent="handleDragOver"
-          @dragleave="handleDragLeave"
-          @click="triggerFileSelect"
-        >
-          <div class="upload-content">
-            <el-icon class="upload-file-icon">
-              <Document />
-            </el-icon>
-            <p class="upload-text">拖拽APK文件到此处，或点击选择文件</p>
-            <p class="upload-hint">支持 .apk 格式，最大文件大小 500MB</p>
-            <el-button type="primary" class="select-file-btn">
-              <el-icon class="select-icon">
-                <Upload />
+        <!-- 步骤1：文件上传 -->
+        <div v-if="!showApkInfoStep">
+          <!-- 文件上传区域 -->
+          <div 
+            class="upload-area"
+            :class="{ 'upload-area-dragover': isDragOver }"
+            @drop="handleFileDrop"
+            @dragover.prevent="handleDragOver"
+            @dragleave="handleDragLeave"
+            @click="triggerFileSelect"
+          >
+            <div class="upload-content">
+              <el-icon class="upload-file-icon">
+                <Document />
               </el-icon>
-              选择文件
-            </el-button>
-          </div>
-        </div>
-
-        <!-- 隐藏的文件输入框 -->
-        <input
-          ref="fileInputRef"
-          type="file"
-          accept=".apk"
-          style="display: none"
-          @change="handleFileSelect"
-        />
-
-        <!-- 已选择的文件信息 -->
-        <div v-if="selectedFile" class="file-info">
-          <div class="file-item">
-            <el-icon class="file-icon">
-              <Document />
-            </el-icon>
-            <div class="file-details">
-              <div class="file-name">{{ selectedFile.name }}</div>
-              <div class="file-size">{{ formatFileSize(selectedFile.size) }}</div>
+              <p class="upload-text">拖拽APK文件到此处，或点击选择文件</p>
+              <p class="upload-hint">支持 .apk 格式，最大文件大小 500MB</p>
+              <el-button type="primary" class="select-file-btn">
+                <el-icon class="select-icon">
+                  <Upload />
+                </el-icon>
+                选择文件
+              </el-button>
             </div>
-            <el-button 
-              type="danger" 
-              text 
-              @click="removeSelectedFile"
-              class="remove-file-btn"
-            >
-              <el-icon>
-                <Close />
+          </div>
+
+          <!-- 隐藏的文件输入框 -->
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept=".apk"
+            style="display: none"
+            @change="handleFileSelect"
+          />
+
+          <!-- 已选择的文件信息 -->
+          <div v-if="selectedFile" class="file-info">
+            <div class="file-item">
+              <el-icon class="file-icon">
+                <Document />
               </el-icon>
-            </el-button>
+              <div class="file-details">
+                <div class="file-name">{{ selectedFile.name }}</div>
+                <div class="file-size">{{ formatFileSize(selectedFile.size) }}</div>
+              </div>
+              <el-button 
+                type="danger" 
+                text 
+                @click="removeSelectedFile"
+                class="remove-file-btn"
+              >
+                <el-icon>
+                  <Close />
+                </el-icon>
+              </el-button>
+            </div>
+          </div>
+
+          <!-- 上传进度 -->
+          <div v-if="uploading" class="upload-progress">
+            <el-progress 
+              :percentage="uploadProgress" 
+              :status="uploadProgress === 100 ? 'success' : undefined"
+            />
+            <p class="progress-text">{{ uploadProgressText }}</p>
           </div>
         </div>
 
-        <!-- 上传进度 -->
-        <div v-if="uploading" class="upload-progress">
-          <el-progress 
-            :percentage="uploadProgress" 
-            :status="uploadProgress === 100 ? 'success' : undefined"
-          />
-          <p class="progress-text">{{ uploadProgressText }}</p>
+        <!-- 步骤2：APK信息确认和发布 -->
+        <div v-if="showApkInfoStep && uploadedApkInfo" class="apk-info-step">
+          <!-- APK解析信息展示 -->
+          <div class="apk-info-section">
+            <h3 class="info-title">
+              <el-icon class="title-icon" style="color: #10B981;">
+                <Check />
+              </el-icon>
+              APK上传成功！
+            </h3>
+            
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">包名：</span>
+                <span class="info-value">{{ uploadedApkInfo.packageName }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">版本号：</span>
+                <span class="info-value">{{ uploadedApkInfo.versionCode }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">版本名称：</span>
+                <span class="info-value">{{ uploadedApkInfo.versionName }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">文件大小：</span>
+                <span class="info-value">{{ formatFileSize(uploadedApkInfo.fileSize) }}</span>
+              </div>
+              <div v-if="!isEditMode" class="info-item">
+                <span class="info-label">MD5：</span>
+                <span class="info-value code-text">{{ uploadedApkInfo.md5 }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 版本更新说明输入框 -->
+          <div class="release-description-section">
+            <h4 class="section-title">
+              {{ isEditMode ? '编辑版本说明' : '版本更新说明' }} 
+              <span class="required">*</span>
+            </h4>
+            <el-input
+              v-model="releaseDescription"
+              type="textarea"
+              :rows="4"
+              :placeholder="isEditMode ? '修改版本更新说明...' : '请详细描述本次更新的内容，这些信息将展示给用户...'"
+              maxlength="500"
+              show-word-limit
+              class="description-input"
+            />
+          </div>
         </div>
       </div>
 
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="handleUploadDialogClose">取消</el-button>
-          <el-button 
-            type="primary" 
-            @click="handleStartUpload"
-            :disabled="!selectedFile || uploading"
-            :loading="uploading"
-          >
-            {{ uploading ? '上传中...' : '开始上传' }}
-          </el-button>
+          <!-- 文件上传步骤的按钮 -->
+          <template v-if="!showApkInfoStep">
+            <el-button @click="handleUploadDialogClose">取消</el-button>
+            <el-button 
+              type="primary" 
+              @click="handleStartUpload"
+              :disabled="!selectedFile || uploading"
+              :loading="uploading"
+            >
+              {{ uploading ? '上传中...' : '开始上传' }}
+            </el-button>
+          </template>
+
+          <!-- APK信息确认步骤的按钮 -->
+          <template v-if="showApkInfoStep">
+            <!-- 编辑模式下的删除按钮单独在左侧 -->
+            <el-button 
+              v-if="showDeleteButton"
+              type="danger" 
+              @click="handleDeleteVersion"
+              :loading="deleting"
+              class="delete-button-left"
+            >
+              {{ deleting ? '删除中...' : '删除版本' }}
+            </el-button>
+            
+            <div class="button-group">
+              <el-button 
+                type="success"
+                @click="handlePublishVersion"
+                :disabled="!canSave"
+                :loading="publishing"
+                class="save-button"
+              >
+                {{ publishing ? '保存中...' : '保存' }}
+              </el-button>
+              <el-button 
+                type="primary" 
+                @click="handleSetAsReleaseVersion"
+                :disabled="!canPublish"
+                :loading="publishing"
+              >
+                {{ publishing ? '设置中...' : '发布版本' }}
+              </el-button>
+            </div>
+          </template>
         </div>
       </template>
     </el-dialog>
@@ -330,7 +410,9 @@ import {
   setReleaseVersion,
   uploadApk,
   getAppList,
-  getAppVersions
+  getAppVersions,
+  deleteAppVersion,
+  updateAppVersion
 } from '../services/appApi'
 
 // 应用数据类型
@@ -448,11 +530,44 @@ const handleCreateApp = () => {
 }
 
 const handleUploadVersion = () => {
+  // 重置为上传模式
+  isEditMode.value = false
+  editingVersion.value = null
   uploadDialogVisible.value = true
 }
 
 const handleEditVersion = (version: AppVersion) => {
-  ElMessage.info(`编辑版本 ${version.version} 功能开发中...`)
+  // 设置编辑模式并直接进入APK信息步骤
+  showApkInfoDialog(version, true)
+}
+
+// 统一的APK信息对话框显示方法
+const showApkInfoDialog = (versionData: any, editMode: boolean = false) => {
+  // 设置模式
+  isEditMode.value = editMode
+  editingVersion.value = editMode ? versionData : null
+  
+  // 设置APK信息
+  if (editMode) {
+    // 编辑模式：从现有版本数据构造APK信息
+    uploadedApkInfo.value = {
+      id: parseInt(versionData.id),
+      packageName: selectedApp.value?.packageId || '',
+      versionCode: versionData.build,
+      versionName: versionData.version,
+      fileSize: parseFloat(versionData.size.replace(/[^\d.]/g, '')) * (versionData.size.includes('MB') ? 1024 * 1024 : 1024),
+      md5: 'editing-mode-no-md5'
+    }
+    releaseDescription.value = versionData.description || ''
+  } else {
+    // 上传模式：使用上传返回的数据
+    uploadedApkInfo.value = versionData
+    releaseDescription.value = ''
+  }
+  
+  // 显示APK信息步骤
+  showApkInfoStep.value = true
+  uploadDialogVisible.value = true
 }
 
 const handleForceUpdateChange = async (value: boolean) => {
@@ -501,10 +616,37 @@ const uploading = ref(false)
 const uploadProgress = ref(0)
 const uploadProgressText = ref('')
 
+// 上传成功后的APK信息展示和发布功能
+const uploadedApkInfo = ref<any>(null)
+const showApkInfoStep = ref(false)
+const releaseDescription = ref('')
+const publishing = ref(false)
+
+// 编辑模式相关
+const isEditMode = ref(false)
+const editingVersion = ref<AppVersion | null>(null)
+const deleting = ref(false)
+
 const handleUploadDialogClose = () => {
   uploadDialogVisible.value = false
   selectedFile.value = null
   isDragOver.value = false
+  
+  // 重置APK信息展示相关状态
+  uploadedApkInfo.value = null
+  showApkInfoStep.value = false
+  releaseDescription.value = ''
+  publishing.value = false
+  
+  // 重置编辑模式相关状态
+  isEditMode.value = false
+  editingVersion.value = null
+  deleting.value = false
+  
+  // 重置上传状态
+  uploading.value = false
+  uploadProgress.value = 0
+  uploadProgressText.value = ''
 }
 
 const handleFileDrop = (event: DragEvent) => {
@@ -595,8 +737,8 @@ const handleStartUpload = async () => {
     const uploadedVersion = await uploadApk(
       selectedFile.value,
       selectedApp.value.packageId,
-      '通过前端上传', // 可以添加一个输入框让用户填写
-      false // 可以添加一个复选框让用户选择
+      '通过前端上传', // 临时描述，用户可以在下一步修改
+      false
     )
     
     // 完成上传进度
@@ -606,16 +748,16 @@ const handleStartUpload = async () => {
     
     ElMessage.success('APK文件上传成功！')
     
+    // 使用统一的方法显示APK信息步骤
+    showApkInfoDialog(uploadedVersion, false)
+    
+    // 重置上传状态
+    uploading.value = false
+    uploadProgress.value = 0
+    uploadProgressText.value = ''
+    
     // 刷新当前应用的版本列表
     await selectApp(selectedApp.value)
-    
-    // 关闭对话框
-    setTimeout(() => {
-      handleUploadDialogClose()
-      uploading.value = false
-      uploadProgress.value = 0
-      uploadProgressText.value = ''
-    }, 1500)
     
   } catch (error: any) {
     console.error('上传失败:', error)
@@ -638,34 +780,138 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-const handleSetReleaseVersion = async (version: AppVersion) => {
+const handleSetAsReleaseVersion = async () => {
+  if (!uploadedApkInfo.value || !selectedApp.value) {
+    ElMessage.error('版本信息丢失，请重新操作')
+    return
+  }
+  
+  try {
+    publishing.value = true
+    
+    // 先执行保存逻辑（更新版本说明）- 不管是编辑模式还是上传模式都要更新说明
+    if (releaseDescription.value.trim()) {
+      await updateAppVersion(uploadedApkInfo.value.id, releaseDescription.value)
+      ElMessage.success('版本信息已保存')
+    }
+    
+    // 再执行发布逻辑（设为当前发布版本）
+    await setReleaseVersion(selectedApp.value.packageId, uploadedApkInfo.value.id)
+    
+    ElMessage.success('已设为当前发布版本！')
+    
+    // 刷新版本列表
+    await selectApp(selectedApp.value)
+    
+    // 关闭对话框
+    handleUploadDialogClose()
+    
+  } catch (error: any) {
+    console.error('设置发布版本失败:', error)
+    const errorMessage = error.response?.data?.message || error.message || '设置发布版本失败，请重试'
+    ElMessage.error(errorMessage)
+  } finally {
+    publishing.value = false
+  }
+}
+
+// 处理发布版本
+const handlePublishVersion = async () => {
+  if (!uploadedApkInfo.value || !selectedApp.value) {
+    ElMessage.error('上传信息丢失，请重新上传')
+    return
+  }
+  
+  try {
+    publishing.value = true
+    
+    if (isEditMode.value) {
+      // 编辑模式：更新版本说明（如果有输入的话）
+      if (releaseDescription.value.trim()) {
+        await updateAppVersion(uploadedApkInfo.value.id, releaseDescription.value)
+        ElMessage.success('版本信息已成功更新！')
+      } else {
+        ElMessage.success('版本信息保存成功（无更新说明）')
+      }
+    } else {
+      // 上传模式：更新版本说明（必须先更新说明再发布）
+      if (releaseDescription.value.trim()) {
+        await updateAppVersion(uploadedApkInfo.value.id, releaseDescription.value)
+        ElMessage.success('版本说明已保存！')
+      } else {
+        ElMessage.success('版本信息保存成功（无更新说明）')
+      }
+    }
+    
+    // 刷新版本列表
+    await selectApp(selectedApp.value)
+    
+    // 关闭对话框
+    handleUploadDialogClose()
+    
+  } catch (error: any) {
+    console.error(isEditMode.value ? '更新失败:' : '保存失败:', error)
+    const errorMessage = error.response?.data?.message || error.message || (isEditMode.value ? '更新失败，请重试' : '保存失败，请重试')
+    ElMessage.error(errorMessage)
+  } finally {
+    publishing.value = false
+  }
+}
+
+// 取消发布，直接关闭对话框
+const handleCancelPublish = () => {
+  handleUploadDialogClose()
+}
+
+// 删除版本
+const handleDeleteVersion = async () => {
+  if (!editingVersion.value) {
+    ElMessage.error('编辑信息丢失，请重新操作')
+    return
+  }
+  
   try {
     await ElMessageBox.confirm(
-      `确定将版本 ${version.version} 设为当前发布版本吗？移动端用户将会收到此版本的更新。`,
-      '确认发布',
+      `确定要删除版本 ${editingVersion.value.version} 吗？删除后无法恢复。`,
+      '确认删除',
       {
-        confirmButtonText: '确定发布',
+        confirmButtonText: '确定删除',
         cancelButtonText: '取消',
-        type: 'warning'
+        type: 'warning',
+        dangerouslyUseHTMLString: false
       }
     )
     
+    deleting.value = true
+    
+    // 调用删除API
+    await deleteAppVersion(parseInt(editingVersion.value.id), false)
+    
+    ElMessage.success('版本删除成功！')
+    
+    // 刷新版本列表
     if (selectedApp.value) {
-      await setReleaseVersion(selectedApp.value.packageId, parseInt(version.id))
-      
-      // 更新本地状态
-      selectedApp.value.versions.forEach(v => {
-        v.isReleased = v.id === version.id
-      })
-      
-      ElMessage.success('发布版本设置成功')
+      await selectApp(selectedApp.value)
     }
-  } catch (error) {
+    
+    // 关闭对话框
+    handleUploadDialogClose()
+    
+  } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('设置失败，请重试')
+      console.error('删除失败:', error)
+      const errorMessage = error.response?.data?.message || error.message || '删除失败，请重试'
+      ElMessage.error(errorMessage)
     }
+  } finally {
+    deleting.value = false
   }
 }
+
+// 按钮状态计算
+const canSave = computed(() => !publishing.value)
+const canPublish = computed(() => !publishing.value && releaseDescription.value.trim())
+const showDeleteButton = computed(() => isEditMode.value)
 </script>
 
 <style scoped>
@@ -1056,22 +1302,8 @@ const handleSetReleaseVersion = async (version: AppVersion) => {
   font-size: 14px;
 }
 
-.release-button {
-  color: #10B981;
-  padding: 4px 8px;
-  font-size: 14px;
-  font-weight: 500;
-}
 
-.release-button:hover {
-  background: #EFF6FF;
-  color: #3B82F6;
-}
 
-.release-icon {
-  margin-right: 4px;
-  font-size: 14px;
-}
 
 /* 空状态 */
 .empty-state {
@@ -1280,6 +1512,156 @@ const handleSetReleaseVersion = async (version: AppVersion) => {
 }
 
 .dialog-footer {
-  text-align: right;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0;
+  margin: 24px 0 0 0;
+  width: 100%;
+}
+
+.button-group {
+  display: flex;
+  gap: 12px;
+}
+
+.delete-button-left {
+  background: #EF4444;
+  border-color: #EF4444;
+  color: white;
+  margin: 0;
+  padding: 8px 16px;
+}
+
+.delete-button-left:hover {
+  background: #DC2626;
+  border-color: #DC2626;
+}
+
+.delete-button {
+  background: #EF4444;
+  border-color: #EF4444;
+  color: white;
+}
+
+.delete-button:hover {
+  background: #DC2626;
+  border-color: #DC2626;
+}
+
+.apk-info-step {
+  padding: 0;
+}
+
+.apk-info-section {
+  background: #F8FAFC;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.info-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 20px 0;
+  display: flex;
+  align-items: center;
+}
+
+.title-icon {
+  margin-right: 8px;
+  font-size: 20px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+}
+
+.info-label {
+  font-size: 14px;
+  color: #6B7280;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.info-value {
+  font-size: 15px;
+  color: #111827;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.code-text {
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  color: #6B7280;
+  background: #F3F4F6;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 400;
+}
+
+.release-description-section {
+  margin-top: 0;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.description-input {
+  width: 100%;
+}
+
+:deep(.description-input .el-textarea__inner) {
+  border-radius: 8px;
+  border: 1px solid #D1D5DB;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+:deep(.description-input .el-textarea__inner:focus) {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.required {
+  color: #EF4444;
+  font-weight: 600;
+}
+
+:deep(.el-dialog__footer) {
+  padding: 0 24px 24px 24px;
+}
+
+.save-button {
+  background: #10B981;
+  border-color: #10B981;
+  color: white;
+}
+
+.save-button:hover {
+  background: #059669;
+  border-color: #059669;
+}
+
+.save-button:disabled {
+  background: #9CA3AF;
+  border-color: #9CA3AF;
 }
 </style> 
