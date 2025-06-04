@@ -509,16 +509,19 @@ const selectApp = async (app: AppInfo) => {
     const versionsResponse = await getAppVersions(app.packageId, 0, 100)
     
     // 转换版本数据格式
-    app.versions = versionsResponse.content.map(version => ({
+    const versions = versionsResponse.content.map(version => ({
       id: version.id.toString(),
       version: version.versionName,
       build: version.versionCode,
       size: formatFileSize(version.fileSize),
-      downloads: Math.floor(Math.random() * 5000), // 模拟下载次数
+      downloads: 0, // 下载次数默认为0
       updateTime: version.updateTime.replace('T', ' ').slice(0, 16),
       description: version.updateDescription || '暂无更新说明',
       isReleased: version.isReleased
     }))
+    
+    // 按更新时间降序排列（从晚到早，最新的在前面）
+    app.versions = versions.sort((a, b) => new Date(b.updateTime).getTime() - new Date(a.updateTime).getTime())
   } catch (error) {
     console.error('加载版本数据失败:', error)
     ElMessage.error('加载版本数据失败')
@@ -943,6 +946,19 @@ const showDeleteButton = computed(() => isEditMode.value)
 :deep(.search-input .el-input__wrapper) {
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background-color: #F8F9FA;
+  border: 1px solid #E9ECEF;
+}
+
+:deep(.search-input .el-input__wrapper:hover) {
+  background-color: #F1F3F4;
+  border-color: #DEE2E6;
+}
+
+:deep(.search-input .el-input__wrapper.is-focus) {
+  background-color: #FFFFFF;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .search-icon {
