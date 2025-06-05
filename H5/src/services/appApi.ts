@@ -5,6 +5,7 @@ import type {
   AppVersion, 
   AppInfoWithLatestVersion, 
   UpdateForceUpdateRequest, 
+  CreateAppRequest,
   PageResponse 
 } from '../types/app'
 
@@ -147,6 +148,16 @@ export const updateAppForceUpdate = async (appId: string, forceUpdate: boolean):
  */
 export const getCurrentReleaseVersion = async (appId: string): Promise<AppVersion | null> => {
   const response = await api.get<ApiResponse<AppVersion | null>>(`/api/admin/app/${appId}/release-version`)
+  return response.data.data
+}
+
+/**
+ * 创建新应用
+ * @param createRequest 创建应用请求
+ * @returns 创建的应用信息
+ */
+export const createApp = async (createRequest: CreateAppRequest): Promise<AppInfo> => {
+  const response = await api.post<ApiResponse<AppInfo>>('/api/admin/app/create', createRequest)
   return response.data.data
 }
 

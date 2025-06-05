@@ -177,19 +177,33 @@
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="200" align="left" header-align="left">
+              <el-table-column label="操作" width="280" align="left" header-align="left">
                 <template #default="{ row }">
-                  <el-button 
-                    type="primary" 
-                    link
-                    class="edit-button"
-                    @click="handleEditVersion(row)"
-                  >
-                    <el-icon class="edit-icon">
-                      <Edit />
-                    </el-icon>
-                    编辑
-                  </el-button>
+                  <div class="action-buttons">
+                    <el-button 
+                      type="primary" 
+                      link
+                      class="edit-button"
+                      @click="handleEditVersion(row)"
+                    >
+                      <el-icon class="edit-icon">
+                        <Edit />
+                      </el-icon>
+                      编辑
+                    </el-button>
+                    <el-button 
+                      v-if="!row.isReleased"
+                      type="success" 
+                      link
+                      class="release-button"
+                      @click="handleSetVersionAsRelease(row)"
+                    >
+                      <el-icon class="release-icon">
+                        <Promotion />
+                      </el-icon>
+                      设为发布版本
+                    </el-button>
+                  </div>
                 </template>
               </el-table-column>
             </el-table>
@@ -387,6 +401,119 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 新建应用对话框 -->
+    <el-dialog
+      v-model="createAppDialogVisible"
+      width="520px"
+      :before-close="handleCreateAppDialogClose"
+      align-center
+      destroy-on-close
+      class="create-app-dialog"
+    >
+      <template #header>
+        <div class="dialog-header">
+          <div class="header-icon">
+            <el-icon :size="24" color="#6366F1">
+              <Plus />
+            </el-icon>
+          </div>
+          <div class="header-content">
+            <h3 class="header-title">创建新应用</h3>
+            <p class="header-subtitle">快速创建一个新的移动应用项目</p>
+          </div>
+        </div>
+      </template>
+      
+      <div class="dialog-body">
+        <el-form 
+          :model="createAppForm" 
+          :rules="createAppRules"
+          ref="createAppFormRef"
+          label-position="top"
+          size="large"
+          class="create-app-form"
+        >
+          <div class="form-field">
+            <el-form-item label="应用名称" prop="appName">
+              <div class="input-wrapper">
+                <el-icon class="input-icon" :size="18" color="#9CA3AF">
+                  <Document />
+                </el-icon>
+                <el-input
+                  v-model="createAppForm.appName"
+                  placeholder="如：我的超级应用"
+                  clearable
+                  maxlength="50"
+                  show-word-limit
+                  class="styled-input"
+                />
+              </div>
+              <div class="field-hint">
+                <el-icon :size="14" color="#10B981">
+                  <Check />
+                </el-icon>
+                用户在设备上看到的应用名称
+              </div>
+            </el-form-item>
+          </div>
+
+          <div class="form-field">
+            <el-form-item label="包名 (Package Name)" prop="packageName">
+              <div class="input-wrapper">
+                <el-icon class="input-icon" :size="18" color="#9CA3AF">
+                  <Folder />
+                </el-icon>
+                <el-input
+                  v-model="createAppForm.packageName"
+                  placeholder="com.company.appname"
+                  clearable
+                  class="styled-input package-input"
+                  @input="validatePackageName"
+                />
+              </div>
+              <div class="field-hint">
+                <el-icon :size="14" color="#F59E0B">
+                  <SwitchButton />
+                </el-icon>
+                应用的唯一标识符，创建后不可修改
+              </div>
+              <div v-if="packageNameError" class="field-error">
+                <el-icon :size="14" color="#EF4444">
+                  <Close />
+                </el-icon>
+                {{ packageNameError }}
+              </div>
+            </el-form-item>
+          </div>
+        </el-form>
+      </div>
+
+      <template #footer>
+        <div class="dialog-actions">
+          <el-button 
+            @click="handleCreateAppDialogClose"
+            size="large"
+            class="cancel-btn"
+          >
+            取消
+          </el-button>
+          <el-button 
+            type="primary" 
+            @click="handleSubmitCreateApp"
+            :loading="creatingApp"
+            :disabled="!canSubmitCreateApp"
+            size="large"
+            class="submit-btn"
+          >
+            <el-icon v-if="!creatingApp" :size="16" style="margin-right: 6px;">
+              <Plus />
+            </el-icon>
+            {{ creatingApp ? '创建中...' : '创建应用' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -403,7 +530,8 @@ import {
   SwitchButton,
   Document,
   Close,
-  Check
+  Check,
+  Promotion
 } from '@element-plus/icons-vue'
 import { 
   updateAppForceUpdate, 
@@ -412,7 +540,8 @@ import {
   getAppList,
   getAppVersions,
   deleteAppVersion,
-  updateAppVersion
+  updateAppVersion,
+  createApp
 } from '../services/appApi'
 
 // 应用数据类型
@@ -452,7 +581,7 @@ const loadApps = async () => {
     
     // 转换数据格式
     apps.value = response.content.map(item => ({
-      id: item.id.toString(),
+      id: item.id ? item.id.toString() : item.appId, // 如果id为null，使用appId作为id
       name: item.appName,
       packageId: item.appId,
       color: generateColor(item.appName), // 生成颜色
@@ -529,7 +658,73 @@ const selectApp = async (app: AppInfo) => {
 }
 
 const handleCreateApp = () => {
-  ElMessage.info('新建应用功能开发中...')
+  createAppDialogVisible.value = true
+  // 重置表单
+  createAppForm.value = {
+    packageName: '',
+    appName: ''
+  }
+  packageNameError.value = ''
+}
+
+const handleCreateAppDialogClose = () => {
+  createAppDialogVisible.value = false
+  // 重置表单
+  createAppForm.value = {
+    packageName: '',
+    appName: ''
+  }
+  packageNameError.value = ''
+  creatingApp.value = false
+  // 重置表单验证
+  if (createAppFormRef.value) {
+    createAppFormRef.value.resetFields()
+  }
+}
+
+const handleSubmitCreateApp = async () => {
+  // 基础验证
+  if (!createAppForm.value.packageName.trim()) {
+    ElMessage.error('请输入包名')
+    return
+  }
+  if (!createAppForm.value.appName.trim()) {
+    ElMessage.error('请输入应用名称')
+    return
+  }
+
+  // 包名格式验证
+  const packageNamePattern = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*$/
+  if (!packageNamePattern.test(createAppForm.value.packageName)) {
+    ElMessage.error('包名格式不正确，应符合Java包名规范（如：com.example.myapp）')
+    return
+  }
+
+  try {
+    creatingApp.value = true
+    
+    await createApp({
+      packageName: createAppForm.value.packageName,
+      appName: createAppForm.value.appName,
+      appDescription: undefined,
+      forceUpdate: false
+    })
+    
+    ElMessage.success('应用创建成功！')
+    
+    // 关闭对话框
+    handleCreateAppDialogClose()
+    
+    // 重新加载应用列表
+    await loadApps()
+    
+  } catch (error: any) {
+    console.error('创建应用失败:', error)
+    const errorMessage = error.response?.data?.message || error.message || '创建应用失败，请重试'
+    ElMessage.error(errorMessage)
+  } finally {
+    creatingApp.value = false
+  }
 }
 
 const handleUploadVersion = () => {
@@ -542,6 +737,41 @@ const handleUploadVersion = () => {
 const handleEditVersion = (version: AppVersion) => {
   // 设置编辑模式并直接进入APK信息步骤
   showApkInfoDialog(version, true)
+}
+
+// 从版本列表中设置发布版本
+const handleSetVersionAsRelease = async (version: AppVersion) => {
+  if (!selectedApp.value) {
+    ElMessage.error('未选择应用')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要将版本 ${version.version} (Build ${version.build}) 设为发布版本吗？这会取消之前的发布版本。`,
+      '确认发布版本',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    // 调用API设置发布版本
+    await setReleaseVersion(selectedApp.value.packageId, parseInt(version.id))
+    
+    ElMessage.success('发布版本设置成功')
+    
+    // 刷新应用版本列表
+    await selectApp(selectedApp.value)
+    
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('设置发布版本失败:', error)
+      const errorMessage = error.response?.data?.message || error.message || '设置发布版本失败'
+      ElMessage.error(errorMessage)
+    }
+  }
 }
 
 // 统一的APK信息对话框显示方法
@@ -629,6 +859,58 @@ const publishing = ref(false)
 const isEditMode = ref(false)
 const editingVersion = ref<AppVersion | null>(null)
 const deleting = ref(false)
+
+// 新建应用对话框相关
+const createAppDialogVisible = ref(false)
+const createAppFormRef = ref()
+const createAppForm = ref<{
+  packageName: string
+  appName: string
+}>({
+  packageName: '',
+  appName: ''
+})
+const creatingApp = ref(false)
+const packageNameError = ref('')
+
+// 表单验证规则
+const createAppRules = {
+  appName: [
+    { required: true, message: '请输入应用名称', trigger: 'blur' },
+    { min: 1, max: 50, message: '应用名称长度在 1 到 50 个字符', trigger: 'blur' }
+  ],
+  packageName: [
+    { required: true, message: '请输入包名', trigger: 'blur' },
+    { 
+      pattern: /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*$/,
+      message: '包名格式不正确，应符合Java包名规范',
+      trigger: 'blur'
+    }
+  ]
+}
+
+// 包名实时验证
+const validatePackageName = () => {
+  const packageName = createAppForm.value.packageName
+  if (!packageName) {
+    packageNameError.value = ''
+    return
+  }
+  
+  const pattern = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*$/
+  if (!pattern.test(packageName)) {
+    packageNameError.value = '包名格式不正确，应以字母开头，用点分隔各部分'
+  } else {
+    packageNameError.value = ''
+  }
+}
+
+// 表单提交验证
+const canSubmitCreateApp = computed(() => {
+  return createAppForm.value.packageName.trim() && 
+         createAppForm.value.appName.trim() && 
+         !packageNameError.value
+})
 
 const handleUploadDialogClose = () => {
   uploadDialogVisible.value = false
@@ -1679,5 +1961,240 @@ const showDeleteButton = computed(() => isEditMode.value)
 .save-button:disabled {
   background: #9CA3AF;
   border-color: #9CA3AF;
+}
+
+/* 操作按钮样式 */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.release-button {
+  color: #10B981;
+  font-weight: 500;
+}
+
+.release-button:hover {
+  color: #059669;
+}
+
+.release-icon {
+  margin-right: 4px;
+  font-size: 14px;
+}
+
+.edit-button {
+  color: #3B82F6;
+  font-weight: 500;
+}
+
+.edit-button:hover {
+  color: #2563EB;
+}
+
+/* 新建应用弹窗样式 */
+:deep(.create-app-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+:deep(.create-app-dialog .el-dialog__header) {
+  padding: 0;
+  margin: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+:deep(.create-app-dialog .el-dialog__body) {
+  padding: 32px 32px 24px 32px;
+}
+
+:deep(.create-app-dialog .el-dialog__footer) {
+  padding: 0 32px 32px 32px;
+  margin: 0;
+}
+
+.dialog-header {
+  padding: 32px 32px 24px 32px;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-icon {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+.header-content {
+  flex: 1;
+}
+
+.header-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  color: white;
+}
+
+.header-subtitle {
+  font-size: 14px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 400;
+}
+
+.dialog-body {
+  background: #FAFBFF;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.create-app-form {
+  margin: 0;
+}
+
+.form-field {
+  margin-bottom: 24px;
+}
+
+.form-field:last-child {
+  margin-bottom: 0;
+}
+
+:deep(.form-field .el-form-item) {
+  margin-bottom: 0;
+}
+
+:deep(.form-field .el-form-item__label) {
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1.5;
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+:deep(.styled-input .el-input__wrapper) {
+  padding-left: 40px;
+  border-radius: 10px;
+  border: 2px solid #E5E7EB;
+  background: white;
+  transition: all 0.3s ease;
+  min-height: 44px;
+}
+
+:deep(.styled-input .el-input__wrapper:hover) {
+  border-color: #C7D2FE;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1);
+}
+
+:deep(.styled-input.is-focus .el-input__wrapper) {
+  border-color: #6366F1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+:deep(.package-input .el-input__inner) {
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.field-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #6B7280;
+  font-weight: 500;
+}
+
+.field-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #EF4444;
+  font-weight: 500;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancel-btn {
+  min-width: 100px;
+  height: 44px;
+  border-radius: 10px;
+  font-weight: 600;
+  background: #F3F4F6;
+  border: 2px solid #E5E7EB;
+  color: #6B7280;
+}
+
+.cancel-btn:hover {
+  background: #E5E7EB;
+  border-color: #D1D5DB;
+  color: #374151;
+}
+
+.submit-btn {
+  min-width: 120px;
+  height: 44px;
+  border-radius: 10px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+  transition: all 0.3s ease;
+}
+
+.submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+}
+
+.submit-btn:disabled {
+  background: #D1D5DB;
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+
+.edit-icon {
+  margin-right: 4px;
+  font-size: 14px;
+}
+
+/* 表单提示样式 */
+.form-tip {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style> 

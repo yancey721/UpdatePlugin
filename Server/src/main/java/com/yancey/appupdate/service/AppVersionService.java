@@ -247,7 +247,7 @@ public class AppVersionService {
             dto.setLatestIsReleased(version.getIsReleased());
             dto.setLatestVersionCreateTime(version.getCreateTime());
         }
-
+        
         return dto;
     }
 
@@ -257,15 +257,15 @@ public class AppVersionService {
     public Page<AppVersionDto> getAppVersions(String appId, Pageable pageable) {
         try {
             log.info("查询应用版本列表: appId={}", appId);
-
+        
             // 验证应用是否存在
             AppInfo appInfo = appInfoRepository.findById(appId)
                     .orElseThrow(() -> new BusinessException("应用不存在: " + appId));
-
+        
             Page<AppVersion> versionsPage = appVersionRepository.findByAppIdOrderByVersionCodeDesc(appId, pageable);
             
             Page<AppVersionDto> dtoPage = versionsPage.map(this::convertToDto);
-
+        
             log.info("查询应用版本列表成功: appId={}, 总数={}", appId, dtoPage.getTotalElements());
             return dtoPage;
 
@@ -442,12 +442,12 @@ public class AppVersionService {
      */
     public com.yancey.appupdate.dto.CheckUpdateResponseDto checkUpdate(String appId, Integer currentVersionCode) {
         try {
-            log.info("检查更新: appId={}, currentVersionCode={}", appId, currentVersionCode);
-
+        log.info("检查更新: appId={}, currentVersionCode={}", appId, currentVersionCode);
+        
             // 验证应用是否存在
             AppInfo appInfo = appInfoRepository.findById(appId)
                     .orElseThrow(() -> new BusinessException("应用不存在: " + appId));
-
+            
             // 查找当前发布版本
             Optional<AppVersion> releaseVersionOpt = appVersionRepository.findByAppIdAndIsReleasedTrue(appId);
             
@@ -455,7 +455,7 @@ public class AppVersionService {
                 log.info("应用暂无发布版本: appId={}", appId);
                 return createNoUpdateResponse();
             }
-
+            
             AppVersion releaseVersion = releaseVersionOpt.get();
             
             // 判断是否需要更新

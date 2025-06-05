@@ -65,6 +65,16 @@ export interface UpdateForceUpdateRequest {
 }
 
 /**
+ * 创建应用请求接口
+ */
+export interface CreateAppRequest {
+  packageName: string
+  appName: string
+  appDescription?: string
+  forceUpdate?: boolean
+}
+
+/**
  * 分页响应接口
  */
 export interface PageResponse<T> {
