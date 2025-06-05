@@ -16,6 +16,15 @@ import type {
  * @returns 是否验证成功
  */
 export const validateApiKey = async (apiKey: string, serverUrl?: string): Promise<boolean> => {
+  // 预先验证API密钥
+  if (!apiKey || apiKey.trim() === '') {
+    throw new Error('请输入API密钥')
+  }
+  
+  if (apiKey.trim().length < 10) {
+    throw new Error('API密钥长度不能少于10位')
+  }
+  
   try {
     // 如果提供了服务器地址，更新baseURL
     if (serverUrl) {
@@ -25,7 +34,7 @@ export const validateApiKey = async (apiKey: string, serverUrl?: string): Promis
     // 临时设置API密钥到请求头
     const response = await api.get<ApiResponse<string>>('/api/admin/app/ping', {
       headers: {
-        'X-API-KEY': apiKey
+        'X-API-KEY': apiKey.trim()
       }
     })
     

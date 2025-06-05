@@ -101,7 +101,9 @@ public class SecurityConfig {
             "http://localhost:3000",
             "http://127.0.0.1:3000",
             "http://localhost:5173", // Vite默认端口
-            "http://127.0.0.1:5173"
+            "http://127.0.0.1:5173",
+            "http://192.168.210.22:3000", // 局域网访问前端
+            "http://192.168.210.22:5173"  // 局域网访问前端Vite端口
         ));
         
         // 允许的HTTP方法

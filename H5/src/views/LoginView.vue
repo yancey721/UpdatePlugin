@@ -110,8 +110,20 @@ const loginForm = reactive({
 
 const rules: FormRules = {
   apiKey: [
-    { required: true, message: '请输入API密钥', trigger: 'blur' },
-    { min: 10, message: 'API密钥长度不能少于10位', trigger: 'blur' }
+    { required: true, message: '请输入API密钥', trigger: ['blur', 'change'] },
+    { min: 10, message: 'API密钥长度不能少于10位', trigger: ['blur', 'change'] },
+    { 
+      validator: (rule, value, callback) => {
+        if (!value || value.trim() === '') {
+          callback(new Error('请输入API密钥'))
+        } else if (value.trim().length < 10) {
+          callback(new Error('API密钥长度不能少于10位'))
+        } else {
+          callback()
+        }
+      },
+      trigger: ['blur', 'change']
+    }
   ],
   serverUrl: [
     { 
@@ -125,7 +137,19 @@ const rules: FormRules = {
 const handleLogin = async () => {
   if (!loginFormRef.value) return
   
+  // 先检查基本的输入验证
+  if (!loginForm.apiKey || loginForm.apiKey.trim() === '') {
+    ElMessage.error('请输入API密钥')
+    return
+  }
+  
+  if (loginForm.apiKey.trim().length < 10) {
+    ElMessage.error('API密钥长度不能少于10位')
+    return
+  }
+  
   try {
+    // 表单验证
     await loginFormRef.value.validate()
     loading.value = true
     
@@ -135,10 +159,10 @@ const handleLogin = async () => {
     }
     
     // 真正的API密钥验证
-    const isValidApiKey = await validateApiKey(loginForm.apiKey, loginForm.serverUrl)
+    const isValidApiKey = await validateApiKey(loginForm.apiKey.trim(), loginForm.serverUrl)
     
     if (isValidApiKey) {
-      authStore.login(loginForm.apiKey)
+      authStore.login(loginForm.apiKey.trim())
       ElMessage.success('登录成功')
       router.push('/admin/apps')
     } else {
@@ -146,8 +170,19 @@ const handleLogin = async () => {
     }
   } catch (error: any) {
     console.error('登录失败:', error)
-    // 显示具体的错误信息
-    ElMessage.error(error.message || '登录失败，请重试')
+    
+    // 更详细的错误处理
+    if (error.message) {
+      ElMessage.error(error.message)
+    } else if (error.response?.data?.message) {
+      ElMessage.error(error.response.data.message)
+    } else if (error.response?.status === 401) {
+      ElMessage.error('API密钥验证失败，请检查密钥是否正确')
+    } else if (error.response?.status === 403) {
+      ElMessage.error('无权限访问，请检查API密钥')
+    } else {
+      ElMessage.error('登录失败，请检查网络连接和服务器地址')
+    }
   } finally {
     loading.value = false
   }
