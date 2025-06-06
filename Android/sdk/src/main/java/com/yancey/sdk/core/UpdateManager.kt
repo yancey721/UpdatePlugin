@@ -2,6 +2,7 @@ package com.yancey.sdk.core
 
 import android.content.Context
 import com.yancey.sdk.callback.DownloadCallback
+import com.yancey.sdk.callback.UICallback
 import com.yancey.sdk.callback.UpdateCallback
 import com.yancey.sdk.config.UpdateConfig
 import com.yancey.sdk.data.CheckUpdateRequest
@@ -9,6 +10,7 @@ import com.yancey.sdk.data.UpdateInfo
 import com.yancey.sdk.data.toUpdateInfo
 import com.yancey.sdk.network.NetworkClient
 import com.yancey.sdk.network.NetworkException
+import com.yancey.sdk.ui.UpdateDialog
 import com.yancey.sdk.util.DeviceInfoHelper
 import com.yancey.sdk.util.Logger
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +34,9 @@ class UpdateManager(
     // 网络客户端
     private val networkClient = NetworkClient(config)
     
+    // UI对话框
+    private val updateDialog = if (config.enableDefaultUI) UpdateDialog(context, config) else null
+    
     // 当前版本信息
     private val currentVersionCode = DeviceInfoHelper.getCurrentVersionCode(context)
     private val currentVersionName = DeviceInfoHelper.getCurrentVersionName(context)
@@ -42,6 +47,7 @@ class UpdateManager(
         Logger.i("UpdateManager", "Current version: $currentVersionName ($currentVersionCode)")
         Logger.i("UpdateManager", "Device: $deviceInfo")
         Logger.i("UpdateManager", "Server URL: ${config.baseUrl}")
+        Logger.i("UpdateManager", "Default UI enabled: ${config.enableDefaultUI}")
     }
     
     /**
@@ -109,11 +115,18 @@ class UpdateManager(
                                 Logger.i("UpdateManager", "Update available: ${updateInfo.newVersionName} (${updateInfo.newVersionCode})")
                                 Logger.i("UpdateManager", "Force update: ${updateInfo.forceUpdate}")
                                 Logger.i("UpdateManager", "File size: ${formatFileSize(updateInfo.fileSize)}")
+                                
+                                // 先调用回调通知有更新
+                                callback.onUpdateCheckSuccess(updateInfo)
+                                
+                                // 如果启用了默认UI，显示更新对话框
+                                if (config.enableDefaultUI && updateDialog != null) {
+                                    showDefaultUpdateDialog(updateInfo)
+                                }
                             } else {
                                 Logger.i("UpdateManager", "No update available")
+                                callback.onUpdateCheckSuccess(updateInfo)
                             }
-                            
-                            callback.onUpdateCheckSuccess(updateInfo)
                         } else {
                             Logger.w("UpdateManager", "Response data is null")
                             callback.onError(-1, "服务端响应数据为空")
@@ -132,6 +145,31 @@ class UpdateManager(
                 callback.onError(-1, "处理服务端响应时发生错误")
             }
         }
+    }
+    
+    /**
+     * 显示默认更新对话框
+     */
+    private fun showDefaultUpdateDialog(updateInfo: UpdateInfo) {
+        Logger.d("UpdateManager", "Showing default update dialog")
+        
+        updateDialog?.showUpdateDialog(updateInfo, object : UICallback {
+            override fun onUserConfirmUpdate(updateInfo: UpdateInfo) {
+                Logger.i("UpdateManager", "User confirmed update, starting download...")
+                // TODO: 在阶段4中实现下载功能
+                startDownload(updateInfo, null)
+            }
+            
+            override fun onUserCancelUpdate(updateInfo: UpdateInfo) {
+                Logger.i("UpdateManager", "User cancelled update")
+                // 用户选择稍后提醒，暂时不做特殊处理
+            }
+            
+            override fun onDialogDismissed(updateInfo: UpdateInfo) {
+                Logger.i("UpdateManager", "Update dialog dismissed")
+                // 对话框被系统关闭，暂时不做特殊处理
+            }
+        })
     }
     
     /**
@@ -161,6 +199,7 @@ class UpdateManager(
      */
     fun release() {
         Logger.d("UpdateManager", "UpdateManager resources released")
+        updateDialog?.dismissCurrentDialog()
         // TODO: 在各阶段实现具体功能后添加清理逻辑
     }
     

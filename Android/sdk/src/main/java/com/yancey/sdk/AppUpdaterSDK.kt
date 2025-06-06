@@ -25,17 +25,19 @@ object AppUpdaterSDK {
     
     /**
      * 初始化SDK
-     * @param context 应用上下文
+     * @param context 应用上下文（建议传入Activity）
      * @param updateConfig SDK配置
      */
     fun init(context: Context, updateConfig: UpdateConfig) {
         this.config = updateConfig
-        this.updateManager = UpdateManager(context.applicationContext, updateConfig)
+        // 注意：为了支持默认UI对话框，这里保留原始context而不是applicationContext
+        this.updateManager = UpdateManager(context, updateConfig)
         this.isInitialized = true
         
         // 初始化日志
         Logger.init(updateConfig.enableLog, updateConfig.logLevel)
         Logger.i("AppUpdaterSDK", "SDK initialized successfully. Version: $VERSION_NAME")
+        Logger.i("AppUpdaterSDK", "Context type: ${context.javaClass.simpleName}")
     }
     
     /**

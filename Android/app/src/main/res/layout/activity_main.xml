@@ -22,6 +22,20 @@
         android:layout_marginBottom="16dp" />
 
     <Button
+        android:id="@+id/btnTestOptionalUpdate"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:text="测试可选更新UI"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnTestForceUpdate"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:text="测试强制更新UI"
+        android:layout_marginBottom="16dp" />
+
+    <Button
         android:id="@+id/btnSdkInfo"
         android:layout_width="200dp"
         android:layout_height="wrap_content"
@@ -31,7 +45,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="阶段1: 基础架构搭建完成\n下一阶段将实现网络请求功能"
+        android:text="阶段3: 默认UI对话框完成\n下一阶段将实现下载功能"
         android:textSize="14sp"
         android:gravity="center"
         android:layout_marginTop="32dp"
