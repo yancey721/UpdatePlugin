@@ -6,13 +6,17 @@ import com.yancey.sdk.callback.UICallback
 import com.yancey.sdk.callback.UpdateCallback
 import com.yancey.sdk.config.UpdateConfig
 import com.yancey.sdk.data.CheckUpdateRequest
+import com.yancey.sdk.data.DownloadProgress
 import com.yancey.sdk.data.UpdateInfo
 import com.yancey.sdk.data.toUpdateInfo
+import com.yancey.sdk.download.ApkDownloadManager
 import com.yancey.sdk.network.NetworkClient
 import com.yancey.sdk.network.NetworkException
+import com.yancey.sdk.ui.DownloadProgressDialog
 import com.yancey.sdk.ui.UpdateDialog
 import com.yancey.sdk.util.DeviceInfoHelper
 import com.yancey.sdk.util.Logger
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,6 +40,12 @@ class UpdateManager(
     
     // UI对话框
     private val updateDialog = if (config.enableDefaultUI) UpdateDialog(context, config) else null
+    
+    // 下载管理器
+    private val downloadManager = ApkDownloadManager(context)
+    
+    // 下载进度对话框
+    private var downloadProgressDialog: DownloadProgressDialog? = null
     
     // 当前版本信息
     private val currentVersionCode = DeviceInfoHelper.getCurrentVersionCode(context)
@@ -178,20 +188,113 @@ class UpdateManager(
      * @param downloadCallback 下载回调
      */
     fun startDownload(updateInfo: UpdateInfo, downloadCallback: DownloadCallback?) {
-        Logger.d("UpdateManager", "startDownload called - will be implemented in stage 4")
+        Logger.d("UpdateManager", "开始下载APK文件")
         Logger.d("UpdateManager", "Download URL: ${updateInfo.downloadUrl}")
         Logger.d("UpdateManager", "File size: ${formatFileSize(updateInfo.fileSize)}")
         
-        // TODO: 在阶段4中实现下载功能
-        downloadCallback?.onDownloadError(-1, "下载功能将在阶段4中实现")
+        // 创建下载回调，结合用户回调和内部逻辑
+        val internalDownloadCallback = object : DownloadCallback {
+            override fun onDownloadStart() {
+                Logger.d("UpdateManager", "下载开始")
+                
+                // 如果启用默认UI，显示下载进度对话框
+                if (config.enableDefaultUI) {
+                    showDownloadProgressDialog(updateInfo)
+                }
+                
+                // 调用用户回调
+                downloadCallback?.onDownloadStart()
+            }
+            
+            override fun onDownloadProgress(downloadProgress: DownloadProgress) {
+                // 更新下载进度对话框
+                downloadProgressDialog?.updateProgress(downloadProgress)
+                
+                // 调用用户回调
+                downloadCallback?.onDownloadProgress(downloadProgress)
+            }
+            
+            override fun onDownloadComplete(file: File) {
+                Logger.d("UpdateManager", "下载完成: ${file.absolutePath}")
+                
+                // 更新下载进度对话框为安装状态
+                downloadProgressDialog?.onDownloadComplete {
+                    // 用户点击立即安装的回调
+                    Logger.i("UpdateManager", "用户点击立即安装")
+                    // TODO: 在阶段5中实现APK安装功能
+                    Logger.i("UpdateManager", "APK安装功能将在阶段5中实现")
+                    
+                    // 临时关闭对话框
+                    downloadProgressDialog?.dismiss()
+                    downloadProgressDialog = null
+                }
+                
+                // 调用用户回调
+                downloadCallback?.onDownloadComplete(file)
+            }
+            
+            override fun onDownloadError(errorCode: Int, errorMessage: String) {
+                Logger.e("UpdateManager", "下载失败: $errorMessage")
+                
+                // 关闭下载进度对话框
+                downloadProgressDialog?.onDownloadError()
+                downloadProgressDialog = null
+                
+                // 调用用户回调
+                downloadCallback?.onDownloadError(errorCode, errorMessage)
+            }
+            
+            override fun onDownloadCancel() {
+                Logger.d("UpdateManager", "下载被取消")
+                
+                // 关闭下载进度对话框
+                downloadProgressDialog?.dismiss()
+                downloadProgressDialog = null
+                
+                // 调用用户回调
+                downloadCallback?.onDownloadCancel()
+            }
+        }
+        
+        // 启动下载
+        val success = downloadManager.downloadApk(updateInfo, internalDownloadCallback)
+        if (!success) {
+            Logger.e("UpdateManager", "启动下载失败")
+            downloadCallback?.onDownloadError(-1, "启动下载失败")
+        }
+    }
+    
+    /**
+     * 显示下载进度对话框
+     */
+    private fun showDownloadProgressDialog(updateInfo: UpdateInfo) {
+        // 关闭之前的下载进度对话框
+        downloadProgressDialog?.dismiss()
+        
+        // 创建新的下载进度对话框
+        downloadProgressDialog = DownloadProgressDialog(
+            context = context,
+            updateInfo = updateInfo,
+            onCancelDownload = {
+                Logger.d("UpdateManager", "用户请求取消下载")
+                cancelDownload()
+            }
+        )
+        
+        // 显示对话框
+        downloadProgressDialog?.show()
     }
     
     /**
      * 取消下载
      */
     fun cancelDownload() {
-        Logger.d("UpdateManager", "cancelDownload called - will be implemented in stage 4")
-        // TODO: 在阶段4中实现
+        Logger.d("UpdateManager", "取消下载")
+        downloadManager.cancelDownload()
+        
+        // 关闭下载进度对话框
+        downloadProgressDialog?.dismiss()
+        downloadProgressDialog = null
     }
     
     /**
@@ -200,7 +303,9 @@ class UpdateManager(
     fun release() {
         Logger.d("UpdateManager", "UpdateManager resources released")
         updateDialog?.dismissCurrentDialog()
-        // TODO: 在各阶段实现具体功能后添加清理逻辑
+        downloadProgressDialog?.dismiss()
+        downloadProgressDialog = null
+        // 注意：不调用cancelDownload()，避免中断正在进行的下载
     }
     
     /**

@@ -1,5 +1,6 @@
 package com.yancey.sdk.callback
 
+import com.yancey.sdk.data.DownloadProgress
 import java.io.File
 
 /**
@@ -14,11 +15,9 @@ interface DownloadCallback {
     
     /**
      * 下载进度更新
-     * @param progress 下载进度 (0-100)
-     * @param currentBytes 已下载字节数
-     * @param totalBytes 总字节数
+     * @param downloadProgress 下载进度信息
      */
-    fun onDownloadProgress(progress: Int, currentBytes: Long, totalBytes: Long)
+    fun onDownloadProgress(downloadProgress: DownloadProgress)
     
     /**
      * 下载完成
