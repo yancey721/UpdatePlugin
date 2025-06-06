@@ -30,10 +30,17 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    
+    // 协程支持
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
+    
+    // JSON解析
+    implementation("com.google.code.gson:gson:2.10.1")
+    
+    // 测试依赖
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

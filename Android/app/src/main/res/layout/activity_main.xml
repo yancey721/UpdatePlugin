@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="App Updater SDK 测试"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="32dp" />
+
+    <Button
+        android:id="@+id/btnCheckUpdate"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:text="检查更新"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnSdkInfo"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:text="SDK信息"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="阶段1: 基础架构搭建完成\n下一阶段将实现网络请求功能"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:layout_marginTop="32dp"
+        android:textColor="@android:color/darker_gray" />
+
+</LinearLayout> 
