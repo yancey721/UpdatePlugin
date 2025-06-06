@@ -1,27 +1,29 @@
 package com.yancey.sdk.ui
 
 import android.app.Activity
+import android.app.Dialog
 import android.content.Context
-import android.content.DialogInterface
-import android.text.method.ScrollingMovementMethod
 import android.view.LayoutInflater
+import android.view.View
+import android.widget.Button
 import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
+import com.yancey.sdk.R
 import com.yancey.sdk.callback.UICallback
 import com.yancey.sdk.config.UpdateConfig
 import com.yancey.sdk.data.UpdateInfo
+import com.yancey.sdk.util.DeviceInfoHelper
 import com.yancey.sdk.util.Logger
 
 /**
- * 默认更新对话框
- * 使用Material Design风格的AlertDialog
+ * 自定义更新对话框
+ * 使用Material Design风格的UI
  */
 class UpdateDialog(
     private val context: Context,
     private val config: UpdateConfig
 ) {
     
-    private var currentDialog: AlertDialog? = null
+    private var currentDialog: Dialog? = null
     
     /**
      * 显示更新对话框
@@ -39,14 +41,41 @@ class UpdateDialog(
         dismissCurrentDialog()
         
         try {
-            Logger.d("UpdateDialog", "Showing update dialog for version ${updateInfo.newVersionName}")
+            Logger.d("UpdateDialog", "显示更新对话框 - 强制更新: ${updateInfo.forceUpdate}")
             
-            val dialog = createUpdateDialog(updateInfo, callback)
-            currentDialog = dialog
-            dialog.show()
+            // 创建自定义对话框
+            currentDialog = Dialog(context, R.style.CustomDialogTheme).apply {
+                val view = LayoutInflater.from(context).inflate(R.layout.dialog_update, null)
+                setContentView(view)
+                
+                // 设置对话框属性
+                setCancelable(!updateInfo.forceUpdate)
+                setCanceledOnTouchOutside(!updateInfo.forceUpdate)
+                
+                // 设置窗口属性
+                window?.let { window ->
+                    window.setBackgroundDrawableResource(android.R.color.transparent)
+                    val layoutParams = window.attributes
+                    layoutParams.width = (context.resources.displayMetrics.widthPixels * 0.85).toInt()
+                    window.attributes = layoutParams
+                }
+                
+                // 初始化视图
+                initViews(view, updateInfo, callback)
+                
+                // 设置取消监听
+                if (!updateInfo.forceUpdate) {
+                    setOnCancelListener {
+                        Logger.d("UpdateDialog", "Dialog cancelled by system")
+                        callback.onDialogDismissed(updateInfo)
+                    }
+                }
+            }
+            
+            currentDialog?.show()
             
         } catch (e: Exception) {
-            Logger.e("UpdateDialog", "Failed to show update dialog: ${e.message}")
+            Logger.e("UpdateDialog", "显示对话框失败", e)
         }
     }
     
@@ -71,97 +100,68 @@ class UpdateDialog(
         }
     }
     
-    /**
-     * 创建更新对话框
-     */
-    private fun createUpdateDialog(updateInfo: UpdateInfo, callback: UICallback): AlertDialog {
-        val dialogBuilder = AlertDialog.Builder(context, getDialogTheme())
+    private fun initViews(view: View, updateInfo: UpdateInfo, callback: UICallback) {
+        // 获取视图组件
+        val tvCurrentVersion = view.findViewById<TextView>(R.id.tvCurrentVersion)
+        val tvNewVersion = view.findViewById<TextView>(R.id.tvNewVersion)
+        val tvFileSize = view.findViewById<TextView>(R.id.tvFileSize)
+        val tvUpdateDescription = view.findViewById<TextView>(R.id.tvUpdateDescription)
+        val tvForceUpdateWarning = view.findViewById<TextView>(R.id.tvForceUpdateWarning)
+        val btnCancel = view.findViewById<Button>(R.id.btnCancel)
+        val btnUpdate = view.findViewById<Button>(R.id.btnUpdate)
         
-        // 设置标题
-        val title = "发现新版本 ${updateInfo.newVersionName}"
-        dialogBuilder.setTitle(title)
+        // 设置版本信息
+        tvCurrentVersion.text = DeviceInfoHelper.getCurrentVersionName(context)
+        tvNewVersion.text = updateInfo.newVersionName
+        tvFileSize.text = formatFileSize(updateInfo.fileSize)
         
-        // 设置内容
-        val message = buildDialogMessage(updateInfo)
-        dialogBuilder.setMessage(message)
+        // 设置更新描述
+        if (updateInfo.updateDescription.isNotEmpty()) {
+            tvUpdateDescription.text = formatUpdateDescription(updateInfo.updateDescription)
+        }
         
-        // 设置正面按钮（立即更新）
-        dialogBuilder.setPositiveButton("立即更新") { dialog, _ ->
-            Logger.d("UpdateDialog", "User confirmed update")
-            dialog.dismiss()
+        // 处理强制更新
+        if (updateInfo.forceUpdate) {
+            tvForceUpdateWarning.visibility = View.VISIBLE
+            btnCancel.visibility = View.GONE
+        } else {
+            tvForceUpdateWarning.visibility = View.GONE
+            btnCancel.visibility = View.VISIBLE
+        }
+        
+        // 设置按钮点击事件
+        btnCancel.setOnClickListener {
+            Logger.d("UpdateDialog", "用户点击稍后提醒")
+            dismissCurrentDialog()
+            callback.onUserCancelUpdate(updateInfo)
+        }
+        
+        btnUpdate.setOnClickListener {
+            Logger.d("UpdateDialog", "用户点击立即更新")
+            dismissCurrentDialog()
             callback.onUserConfirmUpdate(updateInfo)
         }
-        
-        // 设置负面按钮和取消行为
-        if (updateInfo.forceUpdate) {
-            // 强制更新：不可取消，没有负面按钮
-            dialogBuilder.setCancelable(false)
-            Logger.d("UpdateDialog", "Force update mode - dialog not cancelable")
-        } else {
-            // 可选更新：可以取消，有稍后提醒按钮
-            dialogBuilder.setCancelable(true)
-            dialogBuilder.setNegativeButton("稍后提醒") { dialog, _ ->
-                Logger.d("UpdateDialog", "User cancelled update")
-                dialog.dismiss()
-                callback.onUserCancelUpdate(updateInfo)
-            }
-            
-            // 设置对话框关闭监听
-            dialogBuilder.setOnCancelListener {
-                Logger.d("UpdateDialog", "Dialog cancelled by system")
-                callback.onDialogDismissed(updateInfo)
-            }
-        }
-        
-        return dialogBuilder.create()
     }
     
-    /**
-     * 构建对话框消息内容
-     */
-    private fun buildDialogMessage(updateInfo: UpdateInfo): String {
-        val stringBuilder = StringBuilder()
-        
-        // 更新说明
-        if (updateInfo.updateDescription.isNotEmpty()) {
-            stringBuilder.append(updateInfo.updateDescription)
-            stringBuilder.append("\n\n")
-        }
-        
-        // 版本信息
-        stringBuilder.append("新版本：${updateInfo.newVersionName} (${updateInfo.newVersionCode})")
-        stringBuilder.append("\n")
-        
-        // 文件大小
-        val fileSize = formatFileSize(updateInfo.fileSize)
-        stringBuilder.append("文件大小：$fileSize")
-        
-        // 强制更新提示
-        if (updateInfo.forceUpdate) {
-            stringBuilder.append("\n\n")
-            stringBuilder.append("⚠️ 此为强制更新，必须更新后才能继续使用")
-        }
-        
-        return stringBuilder.toString()
-    }
-    
-    /**
-     * 获取对话框主题
-     */
-    private fun getDialogTheme(): Int {
-        return config.dialogTheme ?: androidx.appcompat.R.style.Theme_AppCompat_DayNight_Dialog_Alert
-    }
-    
-    /**
-     * 格式化文件大小
-     */
-    private fun formatFileSize(bytes: Long): String {
+    private fun formatFileSize(sizeInBytes: Long): String {
         return when {
-            bytes >= 1024 * 1024 -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
-            bytes >= 1024 -> "%.1f KB".format(bytes / 1024.0)
-            bytes > 0 -> "$bytes B"
-            else -> "未知"
+            sizeInBytes < 1024 -> "${sizeInBytes} B"
+            sizeInBytes < 1024 * 1024 -> "${String.format("%.1f", sizeInBytes / 1024.0)} KB"
+            sizeInBytes < 1024 * 1024 * 1024 -> "${String.format("%.1f", sizeInBytes / (1024.0 * 1024.0))} MB"
+            else -> "${String.format("%.1f", sizeInBytes / (1024.0 * 1024.0 * 1024.0))} GB"
         }
+    }
+    
+    private fun formatUpdateDescription(description: String): String {
+        // 如果描述已经包含项目符号，直接返回
+        if (description.contains("•") || description.contains("-") || description.contains("*")) {
+            return description
+        }
+        
+        // 否则将每行前面添加项目符号
+        return description.split("\n")
+            .filter { it.isNotBlank() }
+            .joinToString("\n") { "• ${it.trim()}" }
     }
     
     /**
@@ -172,9 +172,9 @@ class UpdateDialog(
             if (dialog.isShowing) {
                 try {
                     dialog.dismiss()
-                    Logger.d("UpdateDialog", "Current dialog dismissed")
+                    Logger.d("UpdateDialog", "对话框已关闭")
                 } catch (e: Exception) {
-                    Logger.w("UpdateDialog", "Error dismissing dialog: ${e.message}")
+                    Logger.w("UpdateDialog", "关闭对话框失败: ${e.message}")
                 }
             }
             currentDialog = null
