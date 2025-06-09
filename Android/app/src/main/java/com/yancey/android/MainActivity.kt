@@ -3,16 +3,27 @@ package com.yancey.android
 import android.os.Bundle
 import android.widget.Button
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.yancey.sdk.AppUpdaterSDK
+import com.yancey.sdk.callback.InstallCallback
 import com.yancey.sdk.callback.UICallback
 import com.yancey.sdk.callback.UpdateCallback
 import com.yancey.sdk.config.LogLevel
 import com.yancey.sdk.config.UpdateConfig
 import com.yancey.sdk.data.UpdateInfo
 import com.yancey.sdk.ui.UpdateDialog
+import com.yancey.sdk.util.Logger
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
+    
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+    
+    // 待安装的APK文件（从设置页返回时使用）
+    private var pendingInstallApk: File? = null
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,6 +34,32 @@ class MainActivity : AppCompatActivity() {
         
         // 设置测试按钮
         setupTestButtons()
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        
+        // 检查SDK内部是否有待安装的任务（用户从设置页返回）
+        AppUpdaterSDK.checkAndHandlePendingInstall()
+        
+        // 检查是否有自定义的待安装任务（用户从设置页返回）
+        pendingInstallApk?.let { file ->
+            Logger.d(TAG, "检查自定义待安装任务的权限状态")
+            
+            // 检查权限是否已获得
+            if (AppUpdaterSDK.checkInstallPermission()) {
+                Logger.i(TAG, "权限已获得，继续安装")
+                val apkToInstall = file
+                pendingInstallApk = null // 清除待安装任务
+                
+                // 重新触发安装
+                AppUpdaterSDK.installApk(apkToInstall, createInstallCallback())
+            } else {
+                Logger.w(TAG, "用户未授予权限")
+                pendingInstallApk = null // 清除待安装任务
+                Toast.makeText(this, "权限未开启，无法安装", Toast.LENGTH_LONG).show()
+            }
+        }
     }
     
     private fun initSDK() {
@@ -49,16 +86,8 @@ class MainActivity : AppCompatActivity() {
             checkUpdate()
         }
         
-        findViewById<Button>(R.id.btnTestOptionalUpdate)?.setOnClickListener {
-            testOptionalUpdateUI()
-        }
-        
-        findViewById<Button>(R.id.btnTestForceUpdate)?.setOnClickListener {
-            testForceUpdateUI()
-        }
-        
-        findViewById<Button>(R.id.btnSdkInfo)?.setOnClickListener {
-            showSDKInfo()
+        findViewById<Button>(R.id.btnTestPermission)?.setOnClickListener {
+            testInstallPermission()
         }
     }
     
@@ -87,81 +116,100 @@ class MainActivity : AppCompatActivity() {
             override fun onError(errorCode: Int, errorMessage: String) {
                 val message = "检查更新失败\n错误码: $errorCode\n错误信息: $errorMessage"
                 showToast(message, Toast.LENGTH_LONG)
-            }
+                }
         })
     }
     
     /**
-     * 测试可选更新UI对话框
+     * 测试安装权限功能
      */
-    private fun testOptionalUpdateUI() {
-        val mockUpdateInfo = UpdateInfo(
-            hasUpdate = true,
-            newVersionCode = 2,
-            newVersionName = "1.1.0",
-            updateDescription = "1. 修复已知问题\n2. 优化用户体验\n3. 新增功能特性\n4. 提升应用性能",
-            forceUpdate = false,
-            downloadUrl = "https://example.com/app-v1.1.0.apk",
-            fileSize = 25600000L,  // 25.6MB
-            md5 = "d41d8cd98f00b204e9800998ecf8427e"
-        )
+    private fun testInstallPermission() {
+        val hasPermission = AppUpdaterSDK.checkInstallPermission()
+        Logger.d(TAG, "当前安装权限状态: $hasPermission")
         
-        showMockUpdateDialog(mockUpdateInfo)
-    }
-    
-    /**
-     * 测试强制更新UI对话框
-     */
-    private fun testForceUpdateUI() {
-        val mockUpdateInfo = UpdateInfo(
-            hasUpdate = true,
-            newVersionCode = 3,
-            newVersionName = "2.0.0",
-            updateDescription = "重大版本更新！\n\n1. 全新界面设计\n2. 核心功能重构\n3. 安全性升级\n4. 性能大幅提升",
-            forceUpdate = true,  // 强制更新
-            downloadUrl = "https://example.com/app-v2.0.0.apk",
-            fileSize = 35800000L,  // 35.8MB
-            md5 = "e58ed763928cf9b4eff36f1d13f3bcdb"
-        )
-        
-        showMockUpdateDialog(mockUpdateInfo)
-    }
-    
-    /**
-     * 显示模拟更新对话框
-     */
-    private fun showMockUpdateDialog(updateInfo: UpdateInfo) {
-        val config = AppUpdaterSDK.getConfig()
-        if (config != null) {
-            val dialog = UpdateDialog(this, config)
-            dialog.showUpdateDialog(updateInfo, object : UICallback {
-                override fun onUserConfirmUpdate(updateInfo: UpdateInfo) {
-                    showToast("用户确认更新 -> 开始下载 ${updateInfo.newVersionName}")
-                }
-                
-                override fun onUserCancelUpdate(updateInfo: UpdateInfo) {
-                    showToast("用户取消更新 -> 稍后提醒")
-                }
-                
-                override fun onDialogDismissed(updateInfo: UpdateInfo) {
-                    showToast("对话框被关闭")
-                }
-            })
+        if (hasPermission) {
+            showToast("已有安装权限")
+        } else {
+            showToast("缺少安装权限，将测试权限请求流程")
+            
+            // 模拟安装一个测试文件来触发权限请求
+            val testFile = File(getExternalFilesDir(null), "test.apk")
+            AppUpdaterSDK.installApk(testFile, createInstallCallback())
         }
     }
     
-    private fun showSDKInfo() {
-        val config = AppUpdaterSDK.getConfig()
-        val info = """
-            SDK版本: ${AppUpdaterSDK.getVersionInfo()}
-            初始化状态: ${AppUpdaterSDK.isInitialized()}
-            应用包名: ${packageName}
-            服务器地址: ${config?.baseUrl ?: "未配置"}
-            默认UI: ${config?.enableDefaultUI ?: false}
-            日志状态: ${config?.enableLog ?: false}
-        """.trimIndent()
-        
-        showToast(info, Toast.LENGTH_LONG)
+    /**
+     * 创建安装回调
+     */
+    private fun createInstallCallback(): InstallCallback {
+        return object : InstallCallback {
+            override fun onInstallStart(apkFile: File) {
+                Logger.i(TAG, "安装启动成功: ${apkFile.name}")
+                showToast("正在启动安装程序...")
+                
+                // 清除待安装任务
+                pendingInstallApk = null
+            }
+            
+            override fun onInstallPermissionRequired(onUserConfirm: () -> Unit, onUserCancel: () -> Unit) {
+                Logger.w(TAG, "需要安装权限，显示权限说明对话框")
+                
+                // 显示权限说明对话框
+                showPermissionExplanationDialog(
+                    onConfirm = {
+                        Logger.d(TAG, "用户确认前往设置页面")
+                        onUserConfirm() // 调用SDK提供的确认回调
+                    },
+                    onCancel = {
+                        Logger.d(TAG, "用户取消权限设置")
+                        onUserCancel() // 调用SDK提供的取消回调
+                    }
+                )
+            }
+            
+            override fun onInstallError(errorCode: Int, errorMessage: String) {
+                Logger.e(TAG, "安装失败: $errorMessage (code: $errorCode)")
+                
+                when (errorCode) {
+                    -1 -> showToast("APK文件不存在", Toast.LENGTH_LONG)
+                    -2 -> showToast("无法打开权限设置页面", Toast.LENGTH_LONG)
+                    -3 -> showToast("权限未开启，无法安装", Toast.LENGTH_LONG)
+                    else -> showToast(errorMessage, Toast.LENGTH_LONG)
+                }
+                
+                // 清除待安装任务
+                pendingInstallApk = null
+            }
+        }
+    }
+    
+    /**
+     * 显示权限说明对话框
+     */
+    private fun showPermissionExplanationDialog(onConfirm: () -> Unit, onCancel: () -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle("需要安装权限")
+            .setMessage("为了自动安装更新版本，需要开启\"安装未知应用\"权限。\n\n点击\"去设置\"将跳转到系统设置页面，请找到本应用并开启该权限。")
+            .setPositiveButton("去设置") { _, _ ->
+                // 记录当前尝试安装的文件，用于从设置页返回时继续安装
+                setPendingInstallFromCurrentContext()
+                onConfirm()
+            }
+            .setNegativeButton("取消") { _, _ ->
+                onCancel()
+            }
+            .setCancelable(false) // 防止用户点击对话框外部关闭
+            .show()
+    }
+    
+    /**
+     * 设置待安装的APK文件
+     */
+    private fun setPendingInstallFromCurrentContext() {
+        // 在真实使用中，这里应该是实际下载完成的APK文件
+        // 为了演示，我们创建一个测试文件路径
+        pendingInstallApk = File(getExternalFilesDir(null), "downloaded_update.apk")
+        Logger.d(TAG, "设置待安装APK: ${pendingInstallApk?.absolutePath}")
     }
     
     private fun showToast(message: String, duration: Int = Toast.LENGTH_SHORT) {

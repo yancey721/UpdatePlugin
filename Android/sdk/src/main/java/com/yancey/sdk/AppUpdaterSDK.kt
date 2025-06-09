@@ -2,11 +2,13 @@ package com.yancey.sdk
 
 import android.content.Context
 import com.yancey.sdk.callback.DownloadCallback
+import com.yancey.sdk.callback.InstallCallback
 import com.yancey.sdk.callback.UpdateCallback
 import com.yancey.sdk.config.UpdateConfig
 import com.yancey.sdk.core.UpdateManager
 import com.yancey.sdk.data.UpdateInfo
 import com.yancey.sdk.util.Logger
+import java.io.File
 
 /**
  * 应用更新SDK主入口类
@@ -81,6 +83,48 @@ object AppUpdaterSDK {
         
         Logger.d("AppUpdaterSDK", "Cancelling download...")
         updateManager?.cancelDownload()
+    }
+    
+    /**
+     * 安装APK文件
+     * @param apkFile APK文件
+     * @param installCallback 安装回调（可选）
+     */
+    fun installApk(apkFile: File, installCallback: InstallCallback? = null) {
+        if (!ensureInitialized()) return
+        
+        Logger.d("AppUpdaterSDK", "Installing APK: ${apkFile.absolutePath}")
+        updateManager?.installApk(apkFile, installCallback)
+    }
+    
+    /**
+     * 检查安装权限
+     * @return 是否有安装权限
+     */
+    fun checkInstallPermission(): Boolean {
+        if (!ensureInitialized()) return false
+        
+        return updateManager?.checkInstallPermission() ?: false
+    }
+    
+    /**
+     * 请求安装权限
+     * @return 是否成功打开权限设置页面
+     */
+    fun requestInstallPermission(): Boolean {
+        if (!ensureInitialized()) return false
+        
+        return updateManager?.requestInstallPermission() ?: false
+    }
+    
+    /**
+     * 检查从设置页返回后的权限状态（用于Activity的onResume中）
+     * @return 是否有待安装任务并已处理
+     */
+    fun checkAndHandlePendingInstall(): Boolean {
+        if (!ensureInitialized()) return false
+        
+        return updateManager?.checkAndHandlePendingInstall() ?: false
     }
     
     /**

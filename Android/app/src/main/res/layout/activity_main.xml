@@ -1,54 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:padding="16dp"
     android:gravity="center"
-    android:padding="16dp">
+    tools:context=".MainActivity">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="App Updater SDK 测试"
+        android:text="App Updater SDK 演示"
         android:textSize="20sp"
         android:textStyle="bold"
         android:layout_marginBottom="32dp" />
 
     <Button
         android:id="@+id/btnCheckUpdate"
-        android:layout_width="200dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="检查更新"
-        android:layout_marginBottom="16dp" />
+        android:textSize="16sp"
+        android:layout_marginBottom="16dp"
+        android:padding="12dp" />
 
     <Button
-        android:id="@+id/btnTestOptionalUpdate"
-        android:layout_width="200dp"
+        android:id="@+id/btnTestPermission"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="测试可选更新UI"
-        android:layout_marginBottom="16dp" />
-
-    <Button
-        android:id="@+id/btnTestForceUpdate"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:text="测试强制更新UI"
-        android:layout_marginBottom="16dp" />
-
-    <Button
-        android:id="@+id/btnSdkInfo"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:text="SDK信息"
-        android:layout_marginBottom="16dp" />
+        android:text="测试安装权限"
+        android:textSize="16sp"
+        android:layout_marginBottom="16dp"
+        android:padding="12dp" />
 
     <TextView
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="阶段3: 默认UI对话框完成\n下一阶段将实现下载功能"
+        android:text="使用说明：\n1. 点击「检查更新」测试完整更新流程\n2. 点击「测试安装权限」测试权限处理逻辑\n3. 当需要权限时会弹出说明对话框\n4. 从设置页返回后会自动检查权限状态"
         android:textSize="14sp"
-        android:gravity="center"
+        android:lineSpacingExtra="4dp"
         android:layout_marginTop="32dp"
-        android:textColor="@android:color/darker_gray" />
+        android:background="#F5F5F5"
+        android:padding="16dp" />
 
 </LinearLayout> 

@@ -39,7 +39,7 @@ android {
 dependencies {
     // SDK模块依赖
     implementation(project(":sdk"))
-    
+
     // Android基础依赖
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
