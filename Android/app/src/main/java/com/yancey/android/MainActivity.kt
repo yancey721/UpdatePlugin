@@ -6,11 +6,13 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.yancey.sdk.AppUpdaterSDK
+import com.yancey.sdk.callback.DownloadCallback
 import com.yancey.sdk.callback.InstallCallback
 import com.yancey.sdk.callback.UICallback
 import com.yancey.sdk.callback.UpdateCallback
 import com.yancey.sdk.config.LogLevel
 import com.yancey.sdk.config.UpdateConfig
+import com.yancey.sdk.data.DownloadProgress
 import com.yancey.sdk.data.UpdateInfo
 import com.yancey.sdk.ui.UpdateDialog
 import com.yancey.sdk.util.Logger
@@ -30,7 +32,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         
         // 初始化SDK
-        initSDK()
+        initSDK(true)
+        
+        // 设置版本信息显示
+        setupVersionInfo()
         
         // 设置测试按钮
         setupTestButtons()
@@ -62,11 +67,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun initSDK() {
+    private fun initSDK(enableDefaultUI: Boolean) {
         val config = UpdateConfig.Builder(this)
             .setBaseUrl("http://192.168.210.22:8080/api/app/")  // 替换为你的服务器地址
             .setAppId(packageName)
-            .enableDefaultUI(true)  // 启用默认UI
+            .enableDefaultUI(enableDefaultUI)  // 启用默认UI
             .showNotification(true)
             .autoInstall(true)
             .enableLog(true)
@@ -81,42 +86,121 @@ class MainActivity : AppCompatActivity() {
         showToast("SDK初始化完成: ${AppUpdaterSDK.getVersionInfo()}")
     }
     
+    /**
+     * 设置版本信息显示
+     */
+    private fun setupVersionInfo() {
+        try {
+            val packageInfo = packageManager.getPackageInfo(packageName, 0)
+            val versionName = packageInfo.versionName
+            val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                packageInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.versionCode.toLong()
+            }
+            
+            val versionText = "当前版本: $versionName ($versionCode)"
+            findViewById<android.widget.TextView>(R.id.tvCurrentVersion)?.text = versionText
+            Logger.d(TAG, "应用版本信息: $versionText")
+            
+        } catch (e: Exception) {
+            Logger.e(TAG, "获取版本信息失败", e)
+            findViewById<android.widget.TextView>(R.id.tvCurrentVersion)?.text = "当前版本: 获取失败"
+        }
+    }
+    
     private fun setupTestButtons() {
+        // 快速集成测试
         findViewById<Button>(R.id.btnCheckUpdate)?.setOnClickListener {
-            checkUpdate()
+            checkUpdateWithDefaultUI()
+        }
+        
+        // 自定义UI演示
+        findViewById<Button>(R.id.btnCustomUpdate)?.setOnClickListener {
+            checkUpdateWithCustomUI()
+        }
+        
+        findViewById<Button>(R.id.btnMockOptionalUpdate)?.setOnClickListener {
+            showMockOptionalUpdateDialog()
+        }
+        
+        findViewById<Button>(R.id.btnMockForceUpdate)?.setOnClickListener {
+            showMockForceUpdateDialog()
+        }
+        
+        // 分步骤控制演示
+        findViewById<Button>(R.id.btnTestDownload)?.setOnClickListener {
+            testDownloadFeature()
+        }
+        
+        findViewById<Button>(R.id.btnTestInstall)?.setOnClickListener {
+            testInstallFeature()
         }
         
         findViewById<Button>(R.id.btnTestPermission)?.setOnClickListener {
             testInstallPermission()
         }
+        
+        // 工具功能
+        findViewById<Button>(R.id.btnSdkInfo)?.setOnClickListener {
+            showSDKInfo()
+        }
+        
+        findViewById<Button>(R.id.btnClearCache)?.setOnClickListener {
+            clearCache()
+        }
     }
     
-    private fun checkUpdate() {
-        showToast("正在检查更新...")
+    /**
+     * 使用默认UI检查更新（完整流程演示）
+     */
+    private fun checkUpdateWithDefaultUI() {
+        showToast("正在检查更新（默认UI模式）...")
+        Logger.d(TAG, "开始默认UI更新流程测试")
         
         AppUpdaterSDK.checkUpdate(object : UpdateCallback {
             override fun onUpdateCheckSuccess(updateInfo: UpdateInfo) {
                 if (updateInfo.hasUpdate) {
-                    val message = """
-                        发现新版本！（将自动显示更新对话框）
-                        
-                        新版本: ${updateInfo.newVersionName} (${updateInfo.newVersionCode})
-                        更新说明: ${updateInfo.updateDescription}
-                        文件大小: ${formatFileSize(updateInfo.fileSize)}
-                        强制更新: ${if (updateInfo.forceUpdate) "是" else "否"}
-                    """.trimIndent()
-                    
-                    showToast(message, Toast.LENGTH_LONG)
-                    // 注意：如果启用了默认UI，UpdateManager会自动显示对话框
+                    Logger.i(TAG, "发现新版本: ${updateInfo.newVersionName}")
+                    showToast("发现新版本，SDK将自动显示更新对话框")
+                    // SDK会自动显示对话框、下载、安装
+                } else {
+                    Logger.i(TAG, "已是最新版本")
+                    showToast("当前已是最新版本")
+                }
+            }
+            
+            override fun onError(errorCode: Int, errorMessage: String) {
+                Logger.e(TAG, "检查更新失败: $errorMessage")
+                showToast("检查更新失败: $errorMessage", Toast.LENGTH_LONG)
+            }
+        })
+    }
+    
+    /**
+     * 使用自定义UI检查更新
+     */
+    private fun checkUpdateWithCustomUI() {
+        // 临时切换到自定义UI模式（实际使用中应该在初始化时设置）
+        initSDK(false)
+        showToast("正在检查更新（自定义UI模式）...")
+        Logger.d(TAG, "开始自定义UI更新流程测试")
+        
+        // 临时切换到自定义UI模式（实际使用中应该在初始化时设置）
+        AppUpdaterSDK.checkUpdate(object : UpdateCallback {
+            override fun onUpdateCheckSuccess(updateInfo: UpdateInfo) {
+                if (updateInfo.hasUpdate) {
+                    // 显示自定义的更新对话框
+                    showCustomUpdateDialog(updateInfo)
                 } else {
                     showToast("当前已是最新版本")
                 }
             }
             
             override fun onError(errorCode: Int, errorMessage: String) {
-                val message = "检查更新失败\n错误码: $errorCode\n错误信息: $errorMessage"
-                showToast(message, Toast.LENGTH_LONG)
-                }
+                showToast("检查更新失败: $errorMessage", Toast.LENGTH_LONG)
+            }
         })
     }
     
@@ -214,6 +298,209 @@ class MainActivity : AppCompatActivity() {
     
     private fun showToast(message: String, duration: Int = Toast.LENGTH_SHORT) {
         Toast.makeText(this, message, duration).show()
+    }
+    
+    /**
+     * 显示自定义更新对话框
+     */
+    private fun showCustomUpdateDialog(updateInfo: UpdateInfo) {
+        val message = """
+            新版本: ${updateInfo.newVersionName} (${updateInfo.newVersionCode})
+            文件大小: ${formatFileSize(updateInfo.fileSize)}
+            强制更新: ${if (updateInfo.forceUpdate) "是" else "否"}
+            
+            更新说明:
+            ${updateInfo.updateDescription}
+        """.trimIndent()
+        
+        val builder = AlertDialog.Builder(this)
+            .setTitle("发现新版本")
+            .setMessage(message)
+            .setPositiveButton("立即更新") { _, _ ->
+                showToast("开始下载更新...")
+                startCustomDownload(updateInfo)
+            }
+            .setCancelable(!updateInfo.forceUpdate)
+        
+        if (!updateInfo.forceUpdate) {
+            builder.setNegativeButton("稍后提醒", null)
+        }
+        
+        builder.show()
+    }
+    
+    /**
+     * 自定义下载流程
+     */
+    private fun startCustomDownload(updateInfo: UpdateInfo) {
+        AppUpdaterSDK.startDownload(updateInfo, object : DownloadCallback {
+            override fun onDownloadStart() {
+                showToast("下载开始")
+            }
+            
+            override fun onDownloadProgress(downloadProgress: DownloadProgress) {
+                val progress = "${downloadProgress.progressPercent}% (${formatFileSize(downloadProgress.downloadedBytes)}/${formatFileSize(downloadProgress.totalBytes)})"
+                Logger.d(TAG, "下载进度: $progress")
+            }
+            
+            override fun onDownloadComplete(file: File) {
+                showToast("下载完成，开始安装")
+                AppUpdaterSDK.installApk(file, createInstallCallback())
+            }
+            
+            override fun onDownloadError(errorCode: Int, errorMessage: String) {
+                showToast("下载失败: $errorMessage", Toast.LENGTH_LONG)
+            }
+            
+            override fun onDownloadCancel() {
+                showToast("下载已取消")
+            }
+        })
+    }
+    
+    /**
+     * 显示模拟可选更新对话框
+     */
+    private fun showMockOptionalUpdateDialog() {
+        val mockUpdateInfo = UpdateInfo(
+            hasUpdate = true,
+            newVersionCode = 2,
+            newVersionName = "1.1.0",
+            updateDescription = "1. 修复已知问题\n2. 优化用户体验\n3. 新增功能特性\n4. 提升应用性能",
+            forceUpdate = false,
+            downloadUrl = "https://example.com/app-v1.1.0.apk",
+            fileSize = 25600000L,  // 25.6MB
+            md5 = "d41d8cd98f00b204e9800998ecf8427e"
+        )
+        
+        showMockUpdateDialog(mockUpdateInfo, "可选更新")
+    }
+    
+    /**
+     * 模拟显示强制更新对话框(默认UI)
+     */
+    private fun showMockForceUpdateDialog() {
+        val mockUpdateInfo = UpdateInfo(
+            hasUpdate = true,
+            newVersionCode = 3,
+            newVersionName = "2.0.0",
+            updateDescription = "重大版本更新！\n\n1. 全新界面设计\n2. 核心功能重构\n3. 安全性升级\n4. 性能大幅提升",
+            forceUpdate = true,  // 强制更新
+            downloadUrl = "https://example.com/app-v2.0.0.apk",
+            fileSize = 35800000L,  // 35.8MB
+            md5 = "e58ed763928cf9b4eff36f1d13f3bcdb"
+        )
+
+        showMockUpdateDialog(mockUpdateInfo, "强制更新")
+    }
+    
+    /**
+     * 显示模拟更新对话框
+     */
+    private fun showMockUpdateDialog(updateInfo: UpdateInfo, type: String) {
+        val config = AppUpdaterSDK.getConfig()
+        if (config != null) {
+            val dialog = UpdateDialog(this, config)
+            dialog.showUpdateDialog(updateInfo, object : UICallback {
+                override fun onUserConfirmUpdate(updateInfo: UpdateInfo) {
+                    showToast("$type 演示：用户确认更新 -> ${updateInfo.newVersionName}")
+                }
+                
+                override fun onUserCancelUpdate(updateInfo: UpdateInfo) {
+                    showToast("$type 演示：用户取消更新")
+                }
+                
+                override fun onDialogDismissed(updateInfo: UpdateInfo) {
+                    showToast("$type 演示：对话框被关闭")
+                }
+            })
+        }
+    }
+    
+    /**
+     * 测试下载功能
+     */
+    private fun testDownloadFeature() {
+        val mockUpdateInfo = UpdateInfo(
+            hasUpdate = true,
+            newVersionCode = 999,
+            newVersionName = "测试版本",
+            updateDescription = "这是一个测试下载功能的模拟版本",
+            forceUpdate = false,
+            downloadUrl = "https://httpbin.org/bytes/1048576", // 1MB测试文件
+            fileSize = 1048576L,
+            md5 = "test"
+        )
+        
+        showToast("开始测试下载功能...")
+        startCustomDownload(mockUpdateInfo)
+    }
+    
+    /**
+     * 测试安装功能
+     */
+    private fun testInstallFeature() {
+        // 创建一个测试APK文件路径
+        val testApkFile = File(getExternalFilesDir(null), "test_install.apk")
+        
+        showToast("测试安装功能（模拟APK文件）")
+        AppUpdaterSDK.installApk(testApkFile, createInstallCallback())
+    }
+    
+    /**
+     * 显示SDK信息
+     */
+    private fun showSDKInfo() {
+        val config = AppUpdaterSDK.getConfig()
+        val permissionSummary = if (AppUpdaterSDK.checkInstallPermission()) "已授权" else "未授权"
+        
+        val info = """
+            📱 SDK信息
+            
+            SDK版本: ${AppUpdaterSDK.getVersionInfo()}
+            初始化状态: ${if (AppUpdaterSDK.isInitialized()) "已初始化" else "未初始化"}
+            
+            📋 配置信息
+            应用包名: ${packageName}
+            服务器地址: ${config?.baseUrl ?: "未配置"}
+            默认UI: ${config?.enableDefaultUI ?: false}
+            日志状态: ${config?.enableLog ?: false}
+            
+            🔐 权限状态
+            安装权限: $permissionSummary
+            Android版本: ${android.os.Build.VERSION.SDK_INT}
+        """.trimIndent()
+        
+        AlertDialog.Builder(this)
+            .setTitle("SDK信息")
+            .setMessage(info)
+            .setPositiveButton("确定", null)
+            .show()
+    }
+    
+    /**
+     * 清除缓存
+     */
+    private fun clearCache() {
+        try {
+            // 清除下载目录
+            val downloadDir = File(getExternalFilesDir(null), "Download")
+            if (downloadDir.exists()) {
+                downloadDir.listFiles()?.forEach { file ->
+                    if (file.name.endsWith(".apk")) {
+                        file.delete()
+                        Logger.d(TAG, "删除缓存文件: ${file.name}")
+                    }
+                }
+            }
+            
+            showToast("缓存清除完成")
+            Logger.d(TAG, "缓存清除完成")
+            
+        } catch (e: Exception) {
+            Logger.e(TAG, "清除缓存失败", e)
+            showToast("清除缓存失败: ${e.message}")
+        }
     }
     
     /**

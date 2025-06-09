@@ -1,47 +1,198 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:gravity="center"
     tools:context=".MainActivity">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="App Updater SDK 演示"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="32dp" />
-
-    <Button
-        android:id="@+id/btnCheckUpdate"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="检查更新"
-        android:textSize="16sp"
-        android:layout_marginBottom="16dp"
-        android:padding="12dp" />
+        android:orientation="vertical"
+        android:padding="16dp">
 
-    <Button
-        android:id="@+id/btnTestPermission"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="测试安装权限"
-        android:textSize="16sp"
-        android:layout_marginBottom="16dp"
-        android:padding="12dp" />
+        <!-- 标题 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="App Updater SDK 演示"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="8dp" />
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="使用说明：\n1. 点击「检查更新」测试完整更新流程\n2. 点击「测试安装权限」测试权限处理逻辑\n3. 当需要权限时会弹出说明对话框\n4. 从设置页返回后会自动检查权限状态"
-        android:textSize="14sp"
-        android:lineSpacingExtra="4dp"
-        android:layout_marginTop="32dp"
-        android:background="#F5F5F5"
-        android:padding="16dp" />
+        <!-- 当前版本信息 -->
+        <TextView
+            android:id="@+id/tvCurrentVersion"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="当前版本: 加载中..."
+            android:textSize="14sp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="24dp"
+            android:textColor="@android:color/darker_gray" />
 
-</LinearLayout> 
+        <!-- 快速集成区域 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🚀 快速集成测试"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnCheckUpdate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="检查更新（默认UI全流程）"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp"
+            android:padding="12dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#E0E0E0"
+            android:layout_marginVertical="16dp" />
+
+        <!-- 自定义UI区域 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎨 自定义UI演示"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnCustomUpdate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="检查更新（自定义UI）"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp"
+            android:padding="12dp" />
+
+        <Button
+            android:id="@+id/btnMockOptionalUpdate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="模拟显示强制更新对话框(默认UI)"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp"
+            android:padding="12dp" />
+
+        <Button
+            android:id="@+id/btnMockForceUpdate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="模拟强制更新对话框"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp"
+            android:padding="12dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#E0E0E0"
+            android:layout_marginVertical="16dp" />
+
+        <!-- 分步骤控制区域 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚙️ 分步骤控制演示"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/btnTestDownload"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="测试下载"
+                android:textSize="14sp"
+                android:layout_marginEnd="4dp" />
+
+            <Button
+                android:id="@+id/btnTestInstall"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="测试安装"
+                android:textSize="14sp"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnTestPermission"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="测试安装权限"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp"
+            android:padding="12dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#E0E0E0"
+            android:layout_marginVertical="16dp" />
+
+        <!-- 工具功能区域 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔧 工具功能"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/btnSdkInfo"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="SDK信息"
+                android:textSize="14sp"
+                android:layout_marginEnd="4dp" />
+
+            <Button
+                android:id="@+id/btnClearCache"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="清除缓存"
+                android:textSize="14sp"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <!-- 说明文档 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📖 功能说明：\n\n🚀 快速集成：一键体验完整更新流程\n🎨 自定义UI：展示SDK的UI定制能力\n⚙️ 分步骤控制：演示各个功能模块的独立调用\n🔧 工具功能：SDK信息查看和调试工具"
+            android:textSize="14sp"
+            android:lineSpacingExtra="4dp"
+            android:layout_marginTop="16dp"
+            android:background="#F8F9FA"
+            android:padding="16dp"
+            android:textColor="#495057" />
+
+    </LinearLayout>
+
+</ScrollView> 
