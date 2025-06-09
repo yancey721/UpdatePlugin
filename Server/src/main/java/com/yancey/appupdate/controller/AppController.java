@@ -72,35 +72,46 @@ public class AppController {
     }
 
     /**
-     * APK文件下载接口
+     * APK文件下载接口 - 支持子目录
+     * 支持路径格式: /api/app/download/{appId}/{fileName}
      * 
-     * @param fileName APK文件名
+     * @param filePath APK文件路径（包含子目录）
      * @param httpRequest HTTP请求
      * @return 文件流
      */
-    @GetMapping("/download/{fileName:.+}")
+    @GetMapping("/download/**")
     public ResponseEntity<Resource> downloadApk(
-            @PathVariable String fileName,
             HttpServletRequest httpRequest) {
         
         try {
-            log.info("开始下载APK: fileName={}", fileName);
+            // 提取完整的文件路径（去掉"/api/app/download/"前缀）
+            String requestURI = httpRequest.getRequestURI();
+            String basePath = "/api/app/download/";
+            
+            if (!requestURI.startsWith(basePath)) {
+                log.warn("无效的下载路径: {}", requestURI);
+                return ResponseEntity.badRequest().build();
+            }
+            
+            String filePath = requestURI.substring(basePath.length());
+            
+            log.info("开始下载APK: filePath={}", filePath);
 
             // 1. 加载文件作为Resource
-            Resource resource = fileStorageService.loadFileAsResource(fileName);
+            Resource resource = fileStorageService.loadFileAsResource(filePath);
             
             if (!resource.exists()) {
-                log.warn("APK文件不存在: fileName={}", fileName);
+                log.warn("APK文件不存在: filePath={}", filePath);
                 return ResponseEntity.notFound().build();
             }
 
             // 2. 确定文件的内容类型
             String contentType = null;
             try {
-                Path filePath = fileStorageService.resolveApkPath(fileName);
-                contentType = Files.probeContentType(filePath);
+                Path resolvedPath = fileStorageService.resolveApkPath(filePath);
+                contentType = Files.probeContentType(resolvedPath);
             } catch (IOException ex) {
-                log.warn("无法确定文件类型: fileName={}, error={}", fileName, ex.getMessage());
+                log.warn("无法确定文件类型: filePath={}, error={}", filePath, ex.getMessage());
             }
 
             // 如果无法确定文件类型，则使用默认值
@@ -108,11 +119,12 @@ public class AppController {
                 contentType = "application/vnd.android.package-archive";
             }
 
-            // 3. 设置响应头
+            // 3. 提取文件名用于下载头
+            String fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
             String headerValue = "attachment; filename=\"" + fileName + "\"";
             
-            log.info("APK文件下载成功: fileName={}, contentType={}, fileSize={}", 
-                    fileName, contentType, resource.contentLength());
+            log.info("APK文件下载成功: filePath={}, fileName={}, contentType={}, fileSize={}", 
+                    filePath, fileName, contentType, resource.contentLength());
 
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
@@ -123,7 +135,7 @@ public class AppController {
                     .body(resource);
             
         } catch (Exception e) {
-            log.error("APK文件下载失败: fileName={}, error={}", fileName, e.getMessage(), e);
+            log.error("APK文件下载失败: error={}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

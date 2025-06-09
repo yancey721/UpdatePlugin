@@ -183,7 +183,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun checkUpdateWithCustomUI() {
         // 临时切换到自定义UI模式（实际使用中应该在初始化时设置）
-        initSDK(false)
+//        initSDK(false)
         showToast("正在检查更新（自定义UI模式）...")
         Logger.d(TAG, "开始自定义UI更新流程测试")
         

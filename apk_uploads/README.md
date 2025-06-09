@@ -1,35 +1,54 @@
-# APK 文件存储目录
+# APK文件存储结构说明
 
-## 📁 目录说明
-此目录用于存储上传的 APK 文件，是 Android 应用更新系统的文件存储位置。
+## 目录结构
 
-## 📋 文件说明
-- **原始APK文件**: 用户上传的原始 APK 文件
-- **处理后文件**: 系统按照 `{appId}-{versionCode}.apk` 格式重命名的文件
-- **临时文件**: 上传过程中的临时文件（系统会自动清理）
+APK文件现在按应用ID分文件夹存储，结构如下：
 
-## 🔧 配置信息
-- **存储路径**: 通过 `app.upload-path` 配置项设置
-- **默认配置**: `../apk_uploads/` (相对于Server目录)
-- **环境变量**: 可通过 `UPLOAD_PATH` 环境变量覆盖
-
-## 📝 注意事项
-- APK 文件不会被提交到 Git 仓库中
-- 系统会自动创建必要的子目录
-- 确保目录具有读写权限
-- 生产环境建议使用绝对路径
-
-## 🗂️ 文件命名规则
-```
-原始文件: {originalFileName}.apk
-处理文件: {appId}-{versionCode}.apk
-临时文件: {appId}-temp.apk
-```
-
-## 🔍 示例文件
 ```
 apk_uploads/
-├── UnifySign_productRelease_v1.1.8001.apk    # 原始文件
-├── com.unifysign.android-56.apk              # 处理后文件
-└── com.unifysign.test-56.apk                 # 测试文件
-``` 
+├── {appId1}/
+│   ├── {appId1}-{version1}.apk
+│   ├── {appId1}-{version2}.apk
+│   └── ...
+├── {appId2}/
+│   ├── {appId2}-{version1}.apk
+│   └── ...
+└── ...
+```
+
+## 示例结构
+
+```
+apk_uploads/
+├── com.example.app1/
+│   ├── com.example.app1-1.apk
+│   └── com.example.app1-2.apk
+├── com.example.app2/
+│   └── com.example.app2-1.apk
+└── com.yancey.android/
+    └── com.yancey.android-1.apk
+```
+
+## 优势
+
+1. **组织清晰**: 每个应用的APK文件都在独立的文件夹中
+2. **便于管理**: 可以轻松查看和管理特定应用的所有版本
+3. **避免冲突**: 不同应用的同版本号文件不会冲突
+4. **便于备份**: 可以按应用进行选择性备份
+5. **便于清理**: 可以轻松删除特定应用的所有版本
+
+## 文件命名规则
+
+- 文件夹名: `{appId}` (经过清理，只保留字母、数字、点、下划线、连字符)
+- 文件名: `{appId}-{versionCode}.apk`
+
+## 下载URL格式
+
+- 新格式: `/api/app/download/{appId}/{fileName}`
+- 示例: `/api/app/download/com.example.app1/com.example.app1-2.apk`
+
+## 兼容性
+
+- 服务器端已更新支持子目录结构
+- 下载接口支持新的路径格式
+- 文件存储服务已适配子目录操作 
